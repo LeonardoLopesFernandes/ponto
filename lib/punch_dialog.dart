@@ -107,7 +107,10 @@ class _PunchDialogState extends State<PunchDialog> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('CONFIRMAR PONTO'),
+                        : const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('CONFIRMAR PONTO'),
+                          ),
                   ),
                   TextButton(
                     onPressed: _loading
@@ -127,7 +130,10 @@ class _PunchDialogState extends State<PunchDialog> {
                         ? () => setState(() => _stepConfirm = true)
                         : null,
                     style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                    child: const Text('AVANÇAR'),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('AVANÇAR'),
+                    ),
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(null),
@@ -245,7 +251,7 @@ class _PunchDialogState extends State<PunchDialog> {
         const SizedBox(height: 16),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 28),
           decoration: BoxDecoration(
             color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(16),
@@ -266,28 +272,29 @@ class _PunchDialogState extends State<PunchDialog> {
                     '${_now.minute.toString().padLeft(2, '0')}',
                     style: const TextStyle(
                       color: PontoApp.brand,
-                      fontSize: 36,
+                      fontSize: 88,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
+                      letterSpacing: -2,
+                      height: 1.0,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Text(
                     _now.second.toString().padLeft(2, '0'),
                     style: const TextStyle(
                       color: Color(0xFF475569),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 formatDatePt(_now),
                 style: const TextStyle(
                   color: Color(0xFF64748B),
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
