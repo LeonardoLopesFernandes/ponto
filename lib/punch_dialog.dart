@@ -83,69 +83,89 @@ class _PunchDialogState extends State<PunchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
-      title: Center(
-        child: Text(
-          _stepConfirm ? 'Confirme seu registro de ponto!' : 'Registre seu ponto',
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _stepConfirm ? 'Confirme seu registro de ponto!' : 'Registre seu ponto',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: PontoApp.brand,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _stepConfirm ? _buildConfirmStep() : _buildCredentialStep(),
+              const SizedBox(height: 22),
+              centeredActions(
+                _stepConfirm
+                    ? [
+                        FilledButton(
+                          onPressed: _loading ? null : _confirm,
+                          style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 56)),
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('CONFIRMAR PONTO'),
+                                ),
+                        ),
+                        TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () => setState(() => _stepConfirm = false),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 56),
+                            foregroundColor: Colors.black87,
+                          ),
+                          child: const Text('Cancelar'),
+                        ),
+                      ]
+                    : [
+                        FilledButton(
+                          onPressed: (_enrollmentCtl.text.trim().isNotEmpty &&
+                                  _passwordCtl.text.isNotEmpty)
+                              ? () => setState(() => _stepConfirm = true)
+                              : null,
+                          style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 56)),
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('AVANÇAR'),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(null),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 56),
+                            foregroundColor: Colors.black87,
+                          ),
+                          child: const Text('Cancelar'),
+                        ),
+                      ],
+              ),
+            ],
+          ),
         ),
       ),
-      content: _stepConfirm ? _buildConfirmStep() : _buildCredentialStep(),
-      actions: [
-        centeredActions(
-          _stepConfirm
-              ? [
-                  FilledButton(
-                    onPressed: _loading ? null : _confirm,
-                    style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                    child: _loading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text('CONFIRMAR PONTO'),
-                          ),
-                  ),
-                  TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => setState(() => _stepConfirm = false),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 52),
-                      foregroundColor: Colors.black87,
-                    ),
-                    child: const Text('Cancelar'),
-                  ),
-                ]
-              : [
-                  FilledButton(
-                    onPressed: (_enrollmentCtl.text.trim().isNotEmpty &&
-                            _passwordCtl.text.isNotEmpty)
-                        ? () => setState(() => _stepConfirm = true)
-                        : null,
-                    style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('AVANÇAR'),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(null),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 52),
-                      foregroundColor: Colors.black87,
-                    ),
-                    child: const Text('Cancelar'),
-                  ),
-                ],
-        ),
-      ],
     );
   }
 

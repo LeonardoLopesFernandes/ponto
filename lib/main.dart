@@ -120,13 +120,19 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late final DateTime _captured;
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
     _captured = DateTime.now();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -138,6 +144,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: PontoApp.brand,
@@ -146,13 +158,16 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+              ScaleTransition(
+                scale: _pulse.drive(Tween<double>(begin: 1.0, end: 0.8)),
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.schedule, size: 64, color: PontoApp.brand),
                 ),
-                child: Icon(Icons.schedule, size: 64, color: PontoApp.brand),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -426,7 +441,7 @@ class _ClockCard extends StatelessWidget {
             clockHms(now),
             style: const TextStyle(
               color: PontoApp.brand,
-              fontSize: 38,
+              fontSize: 58,
               fontWeight: FontWeight.w700,
               letterSpacing: -1,
             ),
