@@ -1,0 +1,25 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+flutter_*.png
+
+# Android
+.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/android/build/
+*.jks
+*.keystore
+
+# IntelliJ
+*.iml
+.idea/
+
+# Misc
+*.log

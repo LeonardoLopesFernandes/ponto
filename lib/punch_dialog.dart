@@ -1,0 +1,394 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import 'api/punch_api.dart';
+import 'main.dart';
+
+Widget centeredActions(List<Widget> buttons) {
+  if (buttons.length == 1) {
+    return Row(mainAxisAlignment: MainAxisAlignment.center, children: buttons);
+  }
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      for (var i = 0; i < buttons.length; i++) ...[
+        if (i > 0) const SizedBox(width: 10),
+        Expanded(child: buttons[i]),
+      ],
+    ],
+  );
+}
+
+class PunchDialog extends StatefulWidget {
+  final String initialEnrollment;
+  final String initialPassword;
+  final bool initialRemember;
+  final Future<PunchFlowResult> Function(
+      String enrollment, String password, bool remember) onRegister;
+
+  const PunchDialog({
+    super.key,
+    required this.initialEnrollment,
+    this.initialPassword = '',
+    required this.initialRemember,
+    required this.onRegister,
+  });
+
+  @override
+  State<PunchDialog> createState() => _PunchDialogState();
+}
+
+class _PunchDialogState extends State<PunchDialog> {
+  late final TextEditingController _enrollmentCtl;
+  late final TextEditingController _passwordCtl;
+  late bool _remember;
+  bool _stepConfirm = false;
+  bool _loading = false;
+  bool _showPassword = false;
+  DateTime _now = DateTime.now();
+  Timer? _clockTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _enrollmentCtl = TextEditingController(text: widget.initialEnrollment);
+    _passwordCtl = TextEditingController(text: widget.initialPassword);
+    _remember = widget.initialRemember;
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    _enrollmentCtl.dispose();
+    _passwordCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    setState(() => _loading = true);
+    final result = await widget.onRegister(
+      _enrollmentCtl.text.trim(),
+      _passwordCtl.text,
+      _remember,
+    );
+    if (mounted) {
+      Navigator.of(context).pop(result);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: Center(
+        child: Text(
+          _stepConfirm ? 'Confirme seu registro de ponto!' : 'Registre seu ponto',
+        ),
+      ),
+      content: _stepConfirm ? _buildConfirmStep() : _buildCredentialStep(),
+      actions: [
+        centeredActions(
+          _stepConfirm
+              ? [
+                  FilledButton(
+                    onPressed: _loading ? null : _confirm,
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('CONFIRMAR PONTO'),
+                  ),
+                  TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => setState(() => _stepConfirm = false),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 52),
+                      foregroundColor: Colors.black87,
+                    ),
+                    child: const Text('Cancelar'),
+                  ),
+                ]
+              : [
+                  FilledButton(
+                    onPressed: (_enrollmentCtl.text.trim().isNotEmpty &&
+                            _passwordCtl.text.isNotEmpty)
+                        ? () => setState(() => _stepConfirm = true)
+                        : null,
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+                    child: const Text('AVANÇAR'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 52),
+                      foregroundColor: Colors.black87,
+                    ),
+                    child: const Text('Cancelar'),
+                  ),
+                ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCredentialStep() {
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+        const Text(
+          'Precisamos da sua identificação para realizar o registro de ponto.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.black87, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _enrollmentCtl,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Matrícula (prontuário)',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _passwordCtl,
+          obscureText: !_showPassword,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: 'Senha',
+            prefixIcon: const Icon(Icons.lock_outline),
+            suffixIcon: TextButton(
+              onPressed: () => setState(() => _showPassword = !_showPassword),
+              style: TextButton.styleFrom(
+                foregroundColor: PontoApp.brand,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: Text(_showPassword ? 'Ocultar' : 'Mostrar'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            InkWell(
+              onTap: () => setState(() => _remember = !_remember),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      _remember
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: _remember ? PontoApp.brand : Colors.black54,
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Lembrar login (matrícula e senha)',
+                      style: TextStyle(color: Colors.black87, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+      ),
+    );
+  }
+
+  Widget _buildConfirmStep() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: const BoxDecoration(
+            color: Color(0xFFEEF2FF),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.lock, color: PontoApp.brand, size: 26),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Confirme seu registro de ponto!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: PontoApp.brand,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Seu ponto será registrado no horário abaixo:',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFCBD5E1),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '${_now.hour.toString().padLeft(2, '0')}:'
+                    '${_now.minute.toString().padLeft(2, '0')}',
+                    style: const TextStyle(
+                      color: PontoApp.brand,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _now.second.toString().padLeft(2, '0'),
+                    style: const TextStyle(
+                      color: Color(0xFF475569),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                formatDatePt(_now),
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SuccessPunchDialog extends StatelessWidget {
+  final PunchResult punch;
+  const SuccessPunchDialog({super.key, required this.punch});
+
+  @override
+  Widget build(BuildContext context) {
+    final time = formatPunchTime(punch.time ?? clockHms(DateTime.now()));
+    return AlertDialog(
+      icon: const Icon(
+        Icons.check_circle,
+        color: PontoApp.success,
+        size: 64,
+      ),
+      title: const Center(child: Text('Ponto registrado!')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Seu ponto foi registrado com sucesso!',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F6EE),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                if (punch.employeeName != null) ...[
+                  Text(
+                    punch.employeeName!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: PontoApp.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Text(
+                  punch.day != null ? '$time  •  ${punch.day}' : time,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: PontoApp.success),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        centeredActions([
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
+            child: const Text('FECHAR'),
+          ),
+        ]),
+      ],
+    );
+  }
+}
+
+class ErrorPunchDialog extends StatelessWidget {
+  final String message;
+  const ErrorPunchDialog({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.warning_amber_rounded,
+          color: PontoApp.error, size: 60),
+      title: const Center(child: Text('Ponto não registrado')),
+      content: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.black87),
+      ),
+      actions: [
+        centeredActions([
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
+            child: const Text('TENTAR NOVAMENTE'),
+          ),
+        ]),
+      ],
+    );
+  }
+}
