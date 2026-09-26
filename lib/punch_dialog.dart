@@ -323,7 +323,7 @@ class _PunchDialogState extends State<PunchDialog> {
             ],
           ),
         ),
-        if (_sugerirSaida() != null) ...[
+        if (_sugerirPausa() != null) ...[
           const SizedBox(height: 16),
           Container(
             width: double.infinity,
@@ -335,11 +335,11 @@ class _PunchDialogState extends State<PunchDialog> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.flag_outlined,
+                const Icon(Icons.coffee_outlined,
                     color: PontoApp.brand, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Saída sugerida: ${_sugerirSaida()}',
+                  'Pausa sugerida: ${_sugerirPausa()}',
                   style: const TextStyle(
                     color: PontoApp.brand,
                     fontSize: 14,
@@ -354,22 +354,28 @@ class _PunchDialogState extends State<PunchDialog> {
     );
   }
 
-  /// Sugere o horário de saída final para totalizar 07:20 trabalhadas,
-  /// com base nos 3 primeiros registros (entrada, início pausa, fim pausa).
-  String? _sugerirSaida() {
-    if (widget.existingPunches.length < 3) return null;
-    final e = _parseHm(widget.existingPunches[0]);
-    final p1 = _parseHm(widget.existingPunches[1]);
-    final p2 = _parseHm(widget.existingPunches[2]);
-    if (e == null || p1 == null || p2 == null) return null;
-    final antes = p1.difference(e);
+  /// Sugere o horário de pausa (início/fim) para totalizar 07:20 trabalhadas,
+  /// usando o início de jornada registrado e o horário atual como fim.
+  String? _sugerirPausa() {
+    if (widget.existingPunches.isEmpty) return null;
+    final inicio = _parseHm(widget.existingPunches[0]);
+    if (inicio == null) return null;
+    final fim = _now;
+    final total = fim.difference(inicio);
+    if (total.isNegative) return null;
     const carga = Duration(hours: 7, minutes: 20);
-    final restante = carga - antes;
-    if (restante.isNegative) return null;
-    final saida = p2.add(restante);
-    return '${saida.hour.toString().padLeft(2, '0')}:'
-        '${saida.minute.toString().padLeft(2, '0')}';
+    final pausa = total - carga;
+    // Precisa de pausa mínima relevante para sugerir.
+    if (pausa < const Duration(minutes: 15)) return null;
+    // Trabalho dividido em duas metades iguais, pausa no meio.
+    final antes = carga ~/ 2; // 3h40
+    final inicioPausa = inicio.add(antes);
+    final fimPausa = inicioPausa.add(pausa);
+    return '${_fmtHm(inicioPausa)} - ${_fmtHm(fimPausa)}';
   }
+
+  String _fmtHm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:'
+      '${d.minute.toString().padLeft(2, '0')}';
 
   DateTime? _parseHm(String t) {
     final parts = t.split(':');
