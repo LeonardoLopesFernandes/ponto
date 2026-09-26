@@ -99,16 +99,18 @@ class _PunchDialogState extends State<PunchDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                _stepConfirm ? 'Confirme seu registro de ponto!' : 'Registre seu ponto',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: PontoApp.brand,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+              if (!_stepConfirm) ...[
+                Text(
+                  'Registre seu ponto',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: PontoApp.brand,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
+              ],
               _stepConfirm ? _buildConfirmStep() : _buildCredentialStep(),
               const SizedBox(height: 22),
               centeredActions(
