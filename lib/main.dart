@@ -159,14 +159,12 @@ class _SplashScreenState extends State<SplashScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               ScaleTransition(
-                scale: _pulse.drive(Tween<double>(begin: 1.0, end: 0.8)),
-                child: Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.schedule, size: 64, color: PontoApp.brand),
+                scale: _pulse.drive(Tween<double>(begin: 1.0, end: 0.85)),
+                child: Image.asset(
+                  'assets/ic_ponto.png',
+                  width: 190,
+                  height: 190,
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 20),

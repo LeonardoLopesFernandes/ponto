@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#0300a2"/>
+  <circle cx="256" cy="190" r="100" fill="none" stroke="#ffffff" stroke-width="20"/>
+  <polyline points="256,120 256,190 300,220" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="335" cy="265" r="45" fill="#ffffff"/>
+  <polyline points="315,265 330,280 355,250" fill="none" stroke="#0300a2" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#ffffff" font-family="Roboto, sans-serif" font-weight="900" text-anchor="middle">
+    <text x="256" y="390" font-size="52" letter-spacing="1">REGISTRAR</text>
+    <text x="256" y="445" font-size="52" letter-spacing="1">PONTO</text>
+  </g>
+</svg>
