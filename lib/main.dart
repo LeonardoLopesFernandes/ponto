@@ -268,6 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
         initialEnrollment: repository.savedEnrollment ?? '',
         initialPassword: repository.savedPassword ?? '',
         initialRemember: repository.rememberLogin,
+        existingPunches: _todayPunches,
         onRegister: (enrollment, password, remember) async {
           if (remember) {
             repository.saveEnrollment(enrollment);
@@ -495,16 +496,17 @@ class _TodayPunchesSection extends StatelessWidget {
       children: [
         const Text(
           'Registros de hoje',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A202C)),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         if (punches.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xFFE3E9FF)),
             ),
             child: const Column(
@@ -520,27 +522,73 @@ class _TodayPunchesSection extends StatelessWidget {
             ),
           )
         else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: punches.map((t) {
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: PontoApp.brand,
-                  borderRadius: BorderRadius.circular(50),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 15,
+                  offset: Offset(0, 4),
                 ),
-                child: Text(
-                  t,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              );
-            }).toList(),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: punches.take(4).map((t) {
+                final hora = t.length > 5 ? t.substring(0, 5) : t;
+                return _TimeCircle(time: hora);
+              }).toList(),
+            ),
           ),
+      ],
+    );
+  }
+}
+
+class _TimeCircle extends StatelessWidget {
+  final String time;
+  const _TimeCircle({required this.time});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 68,
+          height: 68,
+          decoration: const BoxDecoration(
+            color: Color(0xFF0300A2),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            time,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: -2,
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF0300A2)),
+            ),
+            child: const Icon(Icons.check, size: 14, color: Color(0xFF0300A2)),
+          ),
+        ),
       ],
     );
   }

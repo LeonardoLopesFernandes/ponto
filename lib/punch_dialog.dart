@@ -25,6 +25,7 @@ class PunchDialog extends StatefulWidget {
   final String initialEnrollment;
   final String initialPassword;
   final bool initialRemember;
+  final List<String> existingPunches;
   final Future<PunchFlowResult> Function(
       String enrollment, String password, bool remember) onRegister;
 
@@ -33,6 +34,7 @@ class PunchDialog extends StatefulWidget {
     required this.initialEnrollment,
     this.initialPassword = '',
     required this.initialRemember,
+    this.existingPunches = const [],
     required this.onRegister,
   });
 
@@ -321,8 +323,61 @@ class _PunchDialogState extends State<PunchDialog> {
             ],
           ),
         ),
+        if (_sugerirSaida() != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.flag_outlined,
+                    color: PontoApp.brand, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Saída sugerida: ${_sugerirSaida()}',
+                  style: const TextStyle(
+                    color: PontoApp.brand,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
+  }
+
+  /// Sugere o horário de saída final para totalizar 07:20 trabalhadas,
+  /// com base nos 3 primeiros registros (entrada, início pausa, fim pausa).
+  String? _sugerirSaida() {
+    if (widget.existingPunches.length < 3) return null;
+    final e = _parseHm(widget.existingPunches[0]);
+    final p1 = _parseHm(widget.existingPunches[1]);
+    final p2 = _parseHm(widget.existingPunches[2]);
+    if (e == null || p1 == null || p2 == null) return null;
+    final antes = p1.difference(e);
+    const carga = Duration(hours: 7, minutes: 20);
+    final restante = carga - antes;
+    if (restante.isNegative) return null;
+    final saida = p2.add(restante);
+    return '${saida.hour.toString().padLeft(2, '0')}:'
+        '${saida.minute.toString().padLeft(2, '0')}';
+  }
+
+  DateTime? _parseHm(String t) {
+    final parts = t.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, h, m);
   }
 }
 
