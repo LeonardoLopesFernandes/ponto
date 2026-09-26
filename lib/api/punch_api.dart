@@ -26,6 +26,7 @@ class PunchResult {
   final String? time;
   final String? employeeName;
   final List<String> batidasDia;
+  final String? jornada;
 
   PunchResult({
     required this.ok,
@@ -34,6 +35,7 @@ class PunchResult {
     this.time,
     this.employeeName,
     this.batidasDia = const [],
+    this.jornada,
   });
 }
 
@@ -112,6 +114,14 @@ class AhgoraApi {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Espelho do ponto (usando a sessão do login): retorna os dias com
+  /// jornada (sugestão de pausa) e as batidas registradas.
+  Future<Map<String, dynamic>> getEspelho(
+      String company, String ano, String mes) async {
+    final url = '$baseUrl/api-espelho/apuracao/$ano-$mes';
+    return _json(await _get(url, company));
   }
 
   Future<PunchResult> verifyIdentification({
@@ -325,6 +335,41 @@ class PunchRepository {
     );
 
     if (result.ok) {
+      // Busca o espelho do ponto para obter a jornada (sugestão de pausa)
+      // e as batidas reais do dia.
+      try {
+        final hoje = DateTime.now();
+        final espelho = await _api.getEspelho(
+          company,
+          '${hoje.year}',
+          '${hoje.month.toString().padLeft(2, '0')}',
+        );
+        final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
+        final dia = espelho['dias']?[hojeKey];
+        final jornada = dia?['jornada']?.toString() ?? '';
+        final espelhoBatidas = <String>[];
+        final arr = dia?['batidas'];
+        if (arr is List) {
+          for (final b in arr) {
+            if (b is Map) {
+              final hora = b['hora']?.toString() ?? '';
+              if (hora.isNotEmpty) espelhoBatidas.add(formatPunchTime(hora));
+            }
+          }
+        }
+        return PunchFlowResult.success(PunchResult(
+          ok: true,
+          day: result.day,
+          time: result.time,
+          employeeName: result.employeeName,
+          batidasDia: espelhoBatidas.isNotEmpty
+              ? espelhoBatidas
+              : result.batidasDia,
+          jornada: jornada,
+        ));
+      } catch (_) {
+        // Sem espelho, mantém o resultado do registro.
+      }
       return PunchFlowResult.success(result);
     }
     return PunchFlowResult.failure(_mapFailure(result.reason));

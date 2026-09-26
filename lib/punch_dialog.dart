@@ -26,6 +26,7 @@ class PunchDialog extends StatefulWidget {
   final String initialPassword;
   final bool initialRemember;
   final List<String> existingPunches;
+  final String? sugestaoPausa;
   final Future<PunchFlowResult> Function(
       String enrollment, String password, bool remember) onRegister;
 
@@ -35,6 +36,7 @@ class PunchDialog extends StatefulWidget {
     this.initialPassword = '',
     required this.initialRemember,
     this.existingPunches = const [],
+    this.sugestaoPausa,
     required this.onRegister,
   });
 
@@ -323,7 +325,7 @@ class _PunchDialogState extends State<PunchDialog> {
             ],
           ),
         ),
-        if (_sugerirPausa() != null) ...[
+        if (_pausaSugerida() != null) ...[
           const SizedBox(height: 16),
           Container(
             width: double.infinity,
@@ -339,7 +341,7 @@ class _PunchDialogState extends State<PunchDialog> {
                     color: PontoApp.brand, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Pausa sugerida: ${_sugerirPausa()}',
+                  'Pausa sugerida: ${_pausaSugerida()}',
                   style: const TextStyle(
                     color: PontoApp.brand,
                     fontSize: 14,
@@ -352,6 +354,20 @@ class _PunchDialogState extends State<PunchDialog> {
         ],
       ],
     );
+  }
+
+  /// Prefere a jornada do espelho (do site) quando disponível:
+  /// "08:50 | 12:50 | 14:20 | 17:40" -> pausa = horários 2 e 3.
+  String? _pausaSugerida() {
+    final j = widget.sugestaoPausa;
+    if (j != null && j.isNotEmpty) {
+      final parts =
+          j.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (parts.length >= 4) {
+        return '${parts[1]} - ${parts[2]}';
+      }
+    }
+    return _sugerirPausa();
   }
 
   /// Sugere o horário de pausa (início/fim) para totalizar 07:20 trabalhadas,

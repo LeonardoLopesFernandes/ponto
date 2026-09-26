@@ -198,6 +198,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   PunchRepository? _repository;
   List<String> _todayPunches = [];
+  String? _jornada;
   late DateTime _now;
   Timer? _clockTimer;
 
@@ -267,6 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
         initialPassword: repository.savedPassword ?? '',
         initialRemember: repository.rememberLogin,
         existingPunches: _todayPunches,
+        sugestaoPausa: _jornada,
         onRegister: (enrollment, password, remember) async {
           if (remember) {
             repository.saveEnrollment(enrollment);
@@ -291,6 +293,9 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             _todayPunches = [..._todayPunches,
                 clockHms(DateTime.now()).substring(0, 5)];
+          }
+          if (punch.jornada != null && punch.jornada!.isNotEmpty) {
+            _jornada = punch.jornada;
           }
         });
         _persistTodayPunches();
