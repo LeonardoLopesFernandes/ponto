@@ -31,7 +31,7 @@ jobs:
         run: yes | flutter doctor --android-licenses || true
 
       - name: Decode keystore
-        run: echo "$KEYSTORE_BASE64" | base64 -d > android/app/release-key.jks
+        run: echo "$KEYSTORE_BASE64" | base64 -d > android/app/ponto-key.jks
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Build release APK (split arm64-v8a)
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/release-key.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/ponto-key.jks
           KEYSTORE_PASSWORD: minhaloja123
           KEY_ALIAS: minhaloja
           KEY_PASSWORD: minhaloja123

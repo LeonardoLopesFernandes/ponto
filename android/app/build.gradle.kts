@@ -38,8 +38,8 @@ android {
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
-            } else if (file("release-key.jks").exists()) {
-                storeFile = file("release-key.jks")
+            } else if (file("ponto-key.jks").exists()) {
+                storeFile = file("ponto-key.jks")
                 storePassword = "minhaloja123"
                 keyAlias = "minhaloja"
                 keyPassword = "minhaloja123"
