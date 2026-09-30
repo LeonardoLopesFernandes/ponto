@@ -405,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              _TodayPunchesSection(punches: _todayPunches),
+              _TodayPunchesSection(punches: _todayPunches, jornada: _jornada),
             ],
           ),
         ),
@@ -490,7 +490,28 @@ class _GradientButton extends StatelessWidget {
 
 class _TodayPunchesSection extends StatelessWidget {
   final List<String> punches;
-  const _TodayPunchesSection({required this.punches});
+  final String? jornada;
+  const _TodayPunchesSection({required this.punches, this.jornada});
+
+  static const _labels = [
+    'Início\njornada',
+    'Início\npausa',
+    'Fim\npausa',
+    'Fim\njornada',
+  ];
+
+  /// Jornada "08:50 | 12:50 | 14:20 | 17:40" -> 4 horários sugeridos.
+  List<String>? get _sugeridos {
+    final j = jornada;
+    if (j == null || j.isEmpty) return null;
+    final p = j
+        .split('|')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (p.length < 4) return null;
+    return p.take(4).map((s) => s.length > 5 ? s.substring(0, 5) : s).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -541,10 +562,29 @@ class _TodayPunchesSection extends StatelessWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: punches.take(4).map((t) {
-                final hora = t.length > 5 ? t.substring(0, 5) : t;
-                return _TimeCircle(time: hora);
-              }).toList(),
+              children: List.generate(4, (i) {
+                final confirmado = i < punches.length;
+                final t = confirmado ? punches[i] : null;
+                final hora = t != null && t.length > 5
+                    ? t.substring(0, 5)
+                    : t ?? _sugeridos?[i] ?? '--:--';
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _TimeCircle(time: hora, sugerido: !confirmado),
+                    const SizedBox(height: 6),
+                    Text(
+                      _labels[i],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                          height: 1.2),
+                    ),
+                  ],
+                );
+              }),
             ),
           ),
       ],
@@ -554,25 +594,28 @@ class _TodayPunchesSection extends StatelessWidget {
 
 class _TimeCircle extends StatelessWidget {
   final String time;
-  const _TimeCircle({required this.time});
+  final bool sugerido;
+  const _TimeCircle({required this.time, this.sugerido = false});
 
   @override
   Widget build(BuildContext context) {
+    const brand = Color(0xFF0300A2);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
           width: 68,
           height: 68,
-          decoration: const BoxDecoration(
-            color: Color(0xFF0300A2),
+          decoration: BoxDecoration(
+            color: sugerido ? Colors.white : brand,
             shape: BoxShape.circle,
+            border: sugerido ? Border.all(color: brand, width: 2) : null,
           ),
           alignment: Alignment.center,
           child: Text(
             time,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: sugerido ? brand : Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -585,11 +628,15 @@ class _TimeCircle extends StatelessWidget {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: sugerido ? brand : Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF0300A2)),
+              border: Border.all(
+                  color: sugerido ? Colors.white : brand),
             ),
-            child: const Icon(Icons.check, size: 14, color: Color(0xFF0300A2)),
+            child: Icon(
+                sugerido ? Icons.schedule : Icons.check,
+                size: 14,
+                color: sugerido ? Colors.white : brand),
           ),
         ),
       ],
