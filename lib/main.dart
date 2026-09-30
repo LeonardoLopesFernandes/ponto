@@ -523,17 +523,24 @@ class _TodayPunchesSection extends StatelessWidget {
   /// Encaixa cada batida no slot (0..3) mais próximo da jornada.
   /// Assim, registrar só o fim de jornada preenche o slot certo e os
   /// demais vêm do espelho. Sem jornada, mantém a ordem posicional.
+  /// Duplicadas (mesmo minuto) e extras além de 4 são descartadas.
   static List<String?> _slotsAlinhados(
       List<String> punches, List<String>? sug) {
+    final vistos = <String>{};
+    final unicos = <String>[];
+    for (final p in punches) {
+      final h = p.length > 5 ? p.substring(0, 5) : p;
+      if (vistos.add(h)) unicos.add(h);
+    }
     final slots = List<String?>.filled(4, null);
     if (sug == null) {
-      for (var i = 0; i < punches.length && i < 4; i++) {
-        slots[i] = punches[i];
+      for (var i = 0; i < unicos.length && i < 4; i++) {
+        slots[i] = unicos[i];
       }
       return slots;
     }
     final livres = <int>{0, 1, 2, 3};
-    final ordenadas = [...punches]..sort();
+    final ordenadas = [...unicos]..sort();
     for (final p in ordenadas) {
       if (livres.isEmpty) break;
       var best = -1;
