@@ -513,8 +513,49 @@ class _TodayPunchesSection extends StatelessWidget {
     return p.take(4).map((s) => s.length > 5 ? s.substring(0, 5) : s).toList();
   }
 
+  static int _toMin(String t) {
+    final p = t.split(':');
+    final h = int.tryParse(p[0]) ?? 0;
+    final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
+    return h * 60 + m;
+  }
+
+  /// Encaixa cada batida no slot (0..3) mais próximo da jornada.
+  /// Assim, registrar só o fim de jornada preenche o slot certo e os
+  /// demais vêm do espelho. Sem jornada, mantém a ordem posicional.
+  static List<String?> _slotsAlinhados(
+      List<String> punches, List<String>? sug) {
+    final slots = List<String?>.filled(4, null);
+    if (sug == null) {
+      for (var i = 0; i < punches.length && i < 4; i++) {
+        slots[i] = punches[i];
+      }
+      return slots;
+    }
+    final livres = <int>{0, 1, 2, 3};
+    final ordenadas = [...punches]..sort();
+    for (final p in ordenadas) {
+      if (livres.isEmpty) break;
+      var best = -1;
+      var bestDiff = 1 << 30;
+      for (final i in livres) {
+        final d = (_toMin(p) - _toMin(sug[i])).abs();
+        if (d < bestDiff) {
+          bestDiff = d;
+          best = i;
+        }
+      }
+      if (best >= 0) {
+        slots[best] = p;
+        livres.remove(best);
+      }
+    }
+    return slots;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final slots = _slotsAlinhados(punches, _sugeridos);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -563,8 +604,8 @@ class _TodayPunchesSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(4, (i) {
-                final confirmado = i < punches.length;
-                final t = confirmado ? punches[i] : null;
+                final t = slots[i];
+                final confirmado = t != null;
                 final hora = t != null && t.length > 5
                     ? t.substring(0, 5)
                     : t ?? _sugeridos?[i] ?? '--:--';
