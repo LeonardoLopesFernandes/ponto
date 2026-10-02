@@ -500,17 +500,54 @@ class _TodayPunchesSection extends StatelessWidget {
     'Fim\njornada',
   ];
 
+  static String _norm(String s) => s.length > 5 ? s.substring(0, 5) : s;
+
   /// Jornada "08:50 | 12:50 | 14:20 | 17:40" -> 4 horários sugeridos.
-  List<String>? get _sugeridos {
+  /// Sem jornada no espelho, calcula a partir do início já registrado
+  /// (carga 07:20 dividida em duas metades + pausa padrão de 01:30).
+  List<String>? _sugeridos() {
     final j = jornada;
-    if (j == null || j.isEmpty) return null;
-    final p = j
-        .split('|')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    if (p.length < 4) return null;
-    return p.take(4).map((s) => s.length > 5 ? s.substring(0, 5) : s).toList();
+    if (j != null && j.isNotEmpty) {
+      final p = j
+          .split('|')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (p.length >= 4) return p.take(4).map(_norm).toList();
+    }
+    return _sugeridosDoInicio();
+  }
+
+  List<String>? _sugeridosDoInicio() {
+    if (punches.isEmpty) return null;
+    final ordenadas = punches.map(_norm).toList()..sort();
+    final inicio = _parseHm(ordenadas.first);
+    if (inicio == null) return null;
+    const carga = Duration(hours: 7, minutes: 20);
+    const pausa = Duration(hours: 1, minutes: 30);
+    final inicioPausa = inicio.add(carga ~/ 2);
+    final fimPausa = inicioPausa.add(pausa);
+    final fimJornada = inicio.add(carga).add(pausa);
+    return [
+      _fmtHm(inicio),
+      _fmtHm(inicioPausa),
+      _fmtHm(fimPausa),
+      _fmtHm(fimJornada),
+    ];
+  }
+
+  static String _fmtHm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:'
+      '${d.minute.toString().padLeft(2, '0')}';
+
+  static DateTime? _parseHm(String t) {
+    final p = t.split(':');
+    if (p.length < 2) return null;
+    final h = int.tryParse(p[0]);
+    final m = int.tryParse(p[1]);
+    if (h == null || m == null) return null;
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day, h, m);
   }
 
   static int _toMin(String t) {
@@ -562,7 +599,9 @@ class _TodayPunchesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final slots = _slotsAlinhados(punches, _sugeridos);
+    final sugeridos = _sugeridos();
+    final slots = _slotsAlinhados(punches, sugeridos);
+    final fimRegistrado = slots[3] != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -613,13 +652,18 @@ class _TodayPunchesSection extends StatelessWidget {
               children: List.generate(4, (i) {
                 final t = slots[i];
                 final confirmado = t != null;
-                final hora = t != null && t.length > 5
-                    ? t.substring(0, 5)
-                    : t ?? _sugeridos?[i] ?? '--:--';
+                // Com o fim de jornada registrado, os círculos de pausa
+                // (ainda sem batida) são preenchidos com a sugestão.
+                final completa =
+                    !confirmado && fimRegistrado && sugeridos != null;
+                final preenchido = confirmado || completa;
+                final hora = t != null
+                    ? _norm(t)
+                    : sugeridos?[i] ?? '--:--';
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _TimeCircle(time: hora, sugerido: !confirmado),
+                    _TimeCircle(time: hora, sugerido: !preenchido),
                     const SizedBox(height: 6),
                     Text(
                       _labels[i],
