@@ -199,6 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
   PunchRepository? _repository;
   List<String> _todayPunches = [];
   String? _jornada;
+  List<String> _sugestoes = [];
   late DateTime _now;
   Timer? _clockTimer;
 
@@ -296,6 +297,9 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           if (punch.jornada != null && punch.jornada!.isNotEmpty) {
             _jornada = punch.jornada;
+          }
+          if (punch.sugestoes.isNotEmpty) {
+            _sugestoes = punch.sugestoes;
           }
         });
         _persistTodayPunches();
@@ -405,7 +409,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              _TodayPunchesSection(punches: _todayPunches, jornada: _jornada),
+              _TodayPunchesSection(
+                punches: _todayPunches,
+                jornada: _jornada,
+                sugestoes: _sugestoes,
+              ),
             ],
           ),
         ),
@@ -491,7 +499,15 @@ class _GradientButton extends StatelessWidget {
 class _TodayPunchesSection extends StatelessWidget {
   final List<String> punches;
   final String? jornada;
-  const _TodayPunchesSection({required this.punches, this.jornada});
+
+  /// Sugestões vindas do espelho (batidas com tipo "PREVISTA"), por slot.
+  final List<String> sugestoes;
+
+  const _TodayPunchesSection({
+    required this.punches,
+    this.jornada,
+    this.sugestoes = const [],
+  });
 
   static const _labels = [
     'Início\njornada',
@@ -502,52 +518,30 @@ class _TodayPunchesSection extends StatelessWidget {
 
   static String _norm(String s) => s.length > 5 ? s.substring(0, 5) : s;
 
-  /// Jornada "08:50 | 12:50 | 14:20 | 17:40" -> 4 horários sugeridos.
-  /// Sem jornada no espelho, calcula a partir do início já registrado
-  /// (carga 07:20 dividida em duas metades + pausa padrão de 01:30).
+  /// Sugestões por slot: usa as batidas "PREVISTA" do espelho e, para os
+  /// slots ainda em branco, completa com a jornada
+  /// ("08:50 | 12:50 | 14:20 | 17:40"). Sem fonte na API, não sugere nada.
   List<String>? _sugeridos() {
+    final api = sugestoes.take(4).map(_norm).toList();
+    final jor = _jornadaSlots();
+    if (api.every((s) => s.isEmpty) && jor == null) return null;
+    return List.generate(4, (i) {
+      if (i < api.length && api[i].isNotEmpty) return api[i];
+      if (jor != null && i < jor.length) return jor[i];
+      return '';
+    });
+  }
+
+  List<String>? _jornadaSlots() {
     final j = jornada;
-    if (j != null && j.isNotEmpty) {
-      final p = j
-          .split('|')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      if (p.length >= 4) return p.take(4).map(_norm).toList();
-    }
-    return _sugeridosDoInicio();
-  }
-
-  List<String>? _sugeridosDoInicio() {
-    if (punches.isEmpty) return null;
-    final ordenadas = punches.map(_norm).toList()..sort();
-    final inicio = _parseHm(ordenadas.first);
-    if (inicio == null) return null;
-    const carga = Duration(hours: 7, minutes: 20);
-    const pausa = Duration(hours: 1, minutes: 30);
-    final inicioPausa = inicio.add(carga ~/ 2);
-    final fimPausa = inicioPausa.add(pausa);
-    final fimJornada = inicio.add(carga).add(pausa);
-    return [
-      _fmtHm(inicio),
-      _fmtHm(inicioPausa),
-      _fmtHm(fimPausa),
-      _fmtHm(fimJornada),
-    ];
-  }
-
-  static String _fmtHm(DateTime d) =>
-      '${d.hour.toString().padLeft(2, '0')}:'
-      '${d.minute.toString().padLeft(2, '0')}';
-
-  static DateTime? _parseHm(String t) {
-    final p = t.split(':');
-    if (p.length < 2) return null;
-    final h = int.tryParse(p[0]);
-    final m = int.tryParse(p[1]);
-    if (h == null || m == null) return null;
-    final n = DateTime.now();
-    return DateTime(n.year, n.month, n.day, h, m);
+    if (j == null || j.isEmpty) return null;
+    final p = j
+        .split('|')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (p.length < 4) return null;
+    return p.take(4).map(_norm).toList();
   }
 
   static int _toMin(String t) {
@@ -557,9 +551,9 @@ class _TodayPunchesSection extends StatelessWidget {
     return h * 60 + m;
   }
 
-  /// Encaixa cada batida no slot (0..3) mais próximo da jornada.
+  /// Encaixa cada batida no slot (0..3) mais próximo da sugestão.
   /// Assim, registrar só o fim de jornada preenche o slot certo e os
-  /// demais vêm do espelho. Sem jornada, mantém a ordem posicional.
+  /// demais vêm do espelho. Sem sugestão, mantém a ordem posicional.
   /// Duplicadas (mesmo minuto) e extras além de 4 são descartadas.
   static List<String?> _slotsAlinhados(
       List<String> punches, List<String>? sug) {
@@ -583,16 +577,16 @@ class _TodayPunchesSection extends StatelessWidget {
       var best = -1;
       var bestDiff = 1 << 30;
       for (final i in livres) {
+        if (sug[i].isEmpty) continue;
         final d = (_toMin(p) - _toMin(sug[i])).abs();
         if (d < bestDiff) {
           bestDiff = d;
           best = i;
         }
       }
-      if (best >= 0) {
-        slots[best] = p;
-        livres.remove(best);
-      }
+      if (best < 0) best = livres.first;
+      slots[best] = p;
+      livres.remove(best);
     }
     return slots;
   }
@@ -651,15 +645,17 @@ class _TodayPunchesSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(4, (i) {
                 final t = slots[i];
-                final confirmado = t != null;
+                final sugestao = (sugeridos != null && i < sugeridos.length)
+                    ? sugeridos[i]
+                    : '';
                 // Com o fim de jornada registrado, os círculos de pausa
                 // (ainda sem batida) são preenchidos com a sugestão.
                 final completa =
-                    !confirmado && fimRegistrado && sugeridos != null;
-                final preenchido = confirmado || completa;
+                    t == null && fimRegistrado && sugestao.isNotEmpty;
+                final preenchido = t != null || completa;
                 final hora = t != null
                     ? _norm(t)
-                    : sugeridos?[i] ?? '--:--';
+                    : (sugestao.isNotEmpty ? sugestao : '--:--');
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

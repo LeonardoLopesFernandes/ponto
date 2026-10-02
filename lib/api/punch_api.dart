@@ -28,6 +28,11 @@ class PunchResult {
   final List<String> batidasDia;
   final String? jornada;
 
+  /// Sugestões de batida do espelho (entradas com tipo "PREVISTA"),
+  /// alinhadas por posição de slot (0=início, 1=início pausa, 2=fim pausa,
+  /// 3=fim jornada). Posições sem previsão ficam como string vazia.
+  final List<String> sugestoes;
+
   PunchResult({
     required this.ok,
     this.reason,
@@ -36,6 +41,7 @@ class PunchResult {
     this.employeeName,
     this.batidasDia = const [],
     this.jornada,
+    this.sugestoes = const [],
   });
 }
 
@@ -347,12 +353,22 @@ class PunchRepository {
         final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
         final dia = espelho['dias']?[hojeKey];
         final jornada = dia?['jornada']?.toString() ?? '';
+        // O espelho traz as batidas por slot: as reais vêm com tipo
+        // "ORIGINAL" (ou "MANUAL"/"registrado") e as sugestões com tipo
+        // "PREVISTA". Mantemos as sugestões alinhadas à posição do slot.
         final espelhoBatidas = <String>[];
+        final espelhoSugestoes = <String>[];
         final arr = dia?['batidas'];
         if (arr is List) {
           for (final b in arr) {
-            if (b is Map) {
-              final hora = b['hora']?.toString() ?? '';
+            if (b is! Map) continue;
+            final hora = b['hora']?.toString() ?? '';
+            final tipo = (b['tipo']?.toString() ?? '').toUpperCase();
+            if (tipo == 'PREVISTA') {
+              // Mantém a posição do slot (índice do array) na lista.
+              espelhoSugestoes.add(hora.isEmpty ? '' : formatPunchTime(hora));
+            } else {
+              espelhoSugestoes.add('');
               if (hora.isNotEmpty) espelhoBatidas.add(formatPunchTime(hora));
             }
           }
@@ -366,6 +382,7 @@ class PunchRepository {
               ? espelhoBatidas
               : result.batidasDia,
           jornada: jornada,
+          sugestoes: espelhoSugestoes,
         ));
       } catch (_) {
         // Sem espelho, mantém o resultado do registro.
