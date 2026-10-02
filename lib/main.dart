@@ -518,18 +518,50 @@ class _TodayPunchesSection extends StatelessWidget {
 
   static String _norm(String s) => s.length > 5 ? s.substring(0, 5) : s;
 
-  /// Sugestões por slot: usa as batidas "PREVISTA" do espelho e, para os
-  /// slots ainda em branco, completa com a jornada
-  /// ("08:50 | 12:50 | 14:20 | 17:40"). Sem fonte na API, não sugere nada.
+  /// Sugestões por slot. A jornada contratual ("08:50 | 12:50 | 14:20 |
+  /// 17:40") é deslocada para começar na 1ª batida real (ou na batida
+  /// "PREVISTA" da API), de modo que pausa e fim acompanhem o início
+  /// registrado — igual ao espelho. Hoje: início 13:28 -> 13:28 / 17:28 /
+  /// 18:58 / 22:18. Onde a API já manda PREVISTA, ele tem prioridade.
   List<String>? _sugeridos() {
     final api = sugestoes.take(4).map(_norm).toList();
     final jor = _jornadaSlots();
-    if (api.every((s) => s.isEmpty) && jor == null) return null;
-    return List.generate(4, (i) {
+
+    List<String> base;
+    if (jor != null) {
+      final offset = _deslocamentoMinutos(jor, api);
+      base = offset == null
+          ? jor
+          : jor.map((t) => _addMinutos(t, offset)).toList();
+    } else {
+      base = List.generate(4, (i) => i < api.length ? api[i] : '');
+    }
+
+    final result = List.generate(4, (i) {
       if (i < api.length && api[i].isNotEmpty) return api[i];
-      if (jor != null && i < jor.length) return jor[i];
-      return '';
+      return i < base.length ? base[i] : '';
     });
+    if (result.every((s) => s.isEmpty)) return null;
+    return result;
+  }
+
+  /// Minutos a somar na jornada para alinhá-la ao início registrado.
+  /// Prefere o deslocamento indicado pela 1ª batida PREVISTA da API; sem
+  /// PREVISTA, usa a primeira batida real (só com 2+ batidas, para um fim
+  /// isolado não cair no início).
+  int? _deslocamentoMinutos(List<String> jor, List<String> api) {
+    for (var i = 0; i < 4 && i < api.length; i++) {
+      if (api[i].isNotEmpty) return _toMin(api[i]) - _toMin(jor[i]);
+    }
+    if (punches.length < 2) return null;
+    final ordenadas = punches.map(_norm).toList()..sort();
+    return _toMin(ordenadas.first) - _toMin(jor[0]);
+  }
+
+  static String _addMinutos(String t, int delta) {
+    final v = ((_toMin(t) + delta) % 1440 + 1440) % 1440;
+    return '${(v ~/ 60).toString().padLeft(2, '0')}:'
+        '${(v % 60).toString().padLeft(2, '0')}';
   }
 
   List<String>? _jornadaSlots() {
