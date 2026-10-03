@@ -544,12 +544,17 @@ class _TodayPunchesSection extends StatelessWidget {
   /// PREVISTA, usa a primeira batida real (só com 2+ batidas, para um fim
   /// isolado não cair no início).
   int? _deslocamentoMinutos(List<String> jor, List<String> api) {
+    // Alinha a jornada à 1ª batida REAL (mesmo com só 1 registro), para o
+    // "fim de jornada" cair no slot certo. Só usa a PREVISTA se não houver
+    // nenhuma batida real ainda.
+    if (punches.isNotEmpty) {
+      final ordenadas = punches.map(_norm).toList()..sort();
+      return _toMin(ordenadas.first) - _toMin(jor[0]);
+    }
     for (var i = 0; i < 4 && i < api.length; i++) {
       if (api[i].isNotEmpty) return _toMin(api[i]) - _toMin(jor[i]);
     }
-    if (punches.length < 2) return null;
-    final ordenadas = punches.map(_norm).toList()..sort();
-    return _toMin(ordenadas.first) - _toMin(jor[0]);
+    return null;
   }
 
   static String _addMinutos(String t, int delta) {
@@ -622,7 +627,6 @@ class _TodayPunchesSection extends StatelessWidget {
     final apiSug = _sugestoesApi();
     final desloc = _jornadaDeslocada();
     final slots = _slotsAlinhados(punches, desloc ?? apiSug);
-    final fimRegistrado = slots[3] != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -676,14 +680,11 @@ class _TodayPunchesSection extends StatelessWidget {
                     (apiSug != null && i < apiSug.length) ? apiSug[i] : '';
                 final deslocVal =
                     (desloc != null && i < desloc.length) ? desloc[i] : '';
-                // Antes do fim: mostra só o que a API já prevê (ex.: a batida
-                // final). Após o fim: preenche as pausas com a jornada
-                // deslocada (ou a prevista da API), fechando os 4 círculos.
-                final sugestao = fimRegistrado
-                    ? (apiVal.isNotEmpty ? apiVal : deslocVal)
-                    : apiVal;
-                final completa =
-                    t == null && fimRegistrado && sugestao.isNotEmpty;
+                // Logo após o 1º registro, já prevê as pausas (e o fim) com a
+                // jornada deslocada (ou a PREVISTA da API), preenchendo os
+                // círculos em azul. Após registrar, o valor real substitui.
+                final sugestao = apiVal.isNotEmpty ? apiVal : deslocVal;
+                final completa = t == null && sugestao.isNotEmpty;
                 final preenchido = t != null || completa;
                 final hora = t != null
                     ? _norm(t)
