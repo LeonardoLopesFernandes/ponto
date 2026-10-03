@@ -518,31 +518,25 @@ class _TodayPunchesSection extends StatelessWidget {
 
   static String _norm(String s) => s.length > 5 ? s.substring(0, 5) : s;
 
-  /// Sugestões por slot. A jornada contratual ("08:50 | 12:50 | 14:20 |
-  /// 17:40") é deslocada para começar na 1ª batida real (ou na batida
-  /// "PREVISTA" da API), de modo que pausa e fim acompanhem o início
-  /// registrado — igual ao espelho. Hoje: início 13:28 -> 13:28 / 17:28 /
-  /// 18:58 / 22:18. Onde a API já manda PREVISTA, ele tem prioridade.
-  List<String>? _sugeridos() {
+  /// Sugestões "PREVISTA" que a própria API manda por slot (ex.: depois do
+  /// início, o espelho já prevê a batida final). Null se não houver nenhuma.
+  List<String>? _sugestoesApi() {
     final api = sugestoes.take(4).map(_norm).toList();
+    final out = List.generate(4, (i) => i < api.length ? api[i] : '');
+    return out.every((s) => s.isEmpty) ? null : out;
+  }
+
+  /// Jornada contratual deslocada para começar na 1ª batida (ou na 1ª
+  /// PREVISTA). Serve para alinhar as batidas e preencher as pausas quando o
+  /// fim de jornada é registrado. Ex.: início 13:28 -> 17:28 / 18:58 / 22:18.
+  List<String>? _jornadaDeslocada() {
     final jor = _jornadaSlots();
-
-    List<String> base;
-    if (jor != null) {
-      final offset = _deslocamentoMinutos(jor, api);
-      base = offset == null
-          ? jor
-          : jor.map((t) => _addMinutos(t, offset)).toList();
-    } else {
-      base = List.generate(4, (i) => i < api.length ? api[i] : '');
-    }
-
-    final result = List.generate(4, (i) {
-      if (i < api.length && api[i].isNotEmpty) return api[i];
-      return i < base.length ? base[i] : '';
-    });
-    if (result.every((s) => s.isEmpty)) return null;
-    return result;
+    if (jor == null) return null;
+    final api = sugestoes.take(4).map(_norm).toList();
+    final offset = _deslocamentoMinutos(jor, api);
+    return offset == null
+        ? jor
+        : jor.map((t) => _addMinutos(t, offset)).toList();
   }
 
   /// Minutos a somar na jornada para alinhá-la ao início registrado.
@@ -625,8 +619,9 @@ class _TodayPunchesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sugeridos = _sugeridos();
-    final slots = _slotsAlinhados(punches, sugeridos);
+    final apiSug = _sugestoesApi();
+    final desloc = _jornadaDeslocada();
+    final slots = _slotsAlinhados(punches, desloc ?? apiSug);
     final fimRegistrado = slots[3] != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,11 +672,16 @@ class _TodayPunchesSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(4, (i) {
                 final t = slots[i];
-                final sugestao = (sugeridos != null && i < sugeridos.length)
-                    ? sugeridos[i]
-                    : '';
-                // Com o fim de jornada registrado, os círculos de pausa
-                // (ainda sem batida) são preenchidos com a sugestão.
+                final apiVal =
+                    (apiSug != null && i < apiSug.length) ? apiSug[i] : '';
+                final deslocVal =
+                    (desloc != null && i < desloc.length) ? desloc[i] : '';
+                // Antes do fim: mostra só o que a API já prevê (ex.: a batida
+                // final). Após o fim: preenche as pausas com a jornada
+                // deslocada (ou a prevista da API), fechando os 4 círculos.
+                final sugestao = fimRegistrado
+                    ? (apiVal.isNotEmpty ? apiVal : deslocVal)
+                    : apiVal;
                 final completa =
                     t == null && fimRegistrado && sugestao.isNotEmpty;
                 final preenchido = t != null || completa;
