@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/punch_api.dart';
 import 'punch_dialog.dart';
+import 'widgets/ponto_logo_animado.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -120,19 +121,13 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> {
   late final DateTime _captured;
-  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
     _captured = DateTime.now();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -144,12 +139,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: PontoApp.brand,
@@ -158,15 +147,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ScaleTransition(
-                scale: _pulse.drive(Tween<double>(begin: 1.0, end: 0.85)),
-                child: Image.asset(
-                  'assets/ic_ponto.png',
-                  width: 190,
-                  height: 190,
-                  fit: BoxFit.contain,
-                ),
-              ),
+              const PontoLogoAnimado(size: 190),
               const SizedBox(height: 20),
               const Text(
                 'Registrar Ponto',
@@ -921,54 +902,12 @@ class _TodayPunchesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text(
-              'Registros de hoje',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A202C)),
-            ),
-            const Spacer(),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: 'Diagnóstico do espelho',
-              icon: const Icon(Icons.bug_report_outlined,
-                  size: 18, color: Colors.black45),
-              onPressed: () {
-                final txt = ultimoEspelhoJson ?? 'Sem dados do espelho';
-                showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Espelho (diagnóstico)'),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      child: SingleChildScrollView(
-                        child: SelectableText(txt,
-                            style: const TextStyle(fontSize: 11)),
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: txt));
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Espelho copiado')));
-                        },
-                        child: const Text('Copiar'),
-                      ),
-                      TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: const Text('Fechar')),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
+        const Text(
+          'Registros de hoje',
+          style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A202C)),
         ),
         const SizedBox(height: 12),
         if (punches.isEmpty)
