@@ -70,6 +70,14 @@ class AhgoraApi {
   final Map<String, String> _cookies = {};
   bool _sessionInitialized = false;
 
+  // Sessão separada do portal externo (espelho), para não misturar com a
+  // sessão da batida.
+  final HttpClient _externoClient = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 15);
+  final Map<String, String> _externoCookies = {};
+  String? _externoJwt;
+  DateTime? _externoExp;
+
   void clearSession() {
     _cookies.clear();
     _sessionInitialized = false;
@@ -127,10 +135,123 @@ class AhgoraApi {
 
   /// Espelho do ponto (usando a sessão do login): retorna os dias com
   /// jornada (sugestão de pausa) e as batidas registradas.
+  String _externoCookieHeader() =>
+      _externoCookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+
+  Future<String> _externoRequest(
+    String method,
+    String url, {
+    Map<String, String>? headers,
+    String? body,
+  }) async {
+    final request = await _externoClient.openUrl(method, Uri.parse(url));
+    request.headers.set(HttpHeaders.userAgentHeader, userAgent);
+    headers?.forEach((k, v) => request.headers.set(k, v));
+    final cookie = _externoCookieHeader();
+    if (cookie.isNotEmpty) {
+      request.headers.set(HttpHeaders.cookieHeader, cookie);
+    }
+    if (_externoJwt != null && _externoJwt!.isNotEmpty) {
+      request.headers
+          .set(HttpHeaders.authorizationHeader, 'Bearer ${_externoJwt!}');
+    }
+    if (body != null) request.add(utf8.encode(body));
+    final response = await request.close();
+    for (final line in response.headers[HttpHeaders.setCookieHeader] ??
+        const <String>[]) {
+      final first = line.split(';').first.trim();
+      final idx = first.indexOf('=');
+      if (idx > 0) {
+        _externoCookies[first.substring(0, idx)] = first.substring(idx + 1);
+      }
+    }
+    final text = await utf8.decoder.bind(response).join();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AhgoraApiException(
+          'Erro HTTP ${response.statusCode}', response.statusCode);
+    }
+    return text;
+  }
+
+  /// Login do portal externo (empresa + matrícula + senha). Retorna o JWT
+  /// (qwert-external) usado pelo espelho e o mantém em cache até expirar.
+  Future<bool> ensureExternoLogin(
+      String company, String matricula, String password) async {
+    final now = DateTime.now();
+    if (_externoJwt != null &&
+        _externoExp != null &&
+        _externoExp!.isAfter(now.add(const Duration(minutes: 5)))) {
+      return true;
+    }
+    try {
+      final pageUrl =
+          '$baseUrl/externo/index/${Uri.encodeQueryComponent(company)}';
+      final page = await _externoRequest('GET', pageUrl, headers: {
+        HttpHeaders.acceptHeader: 'text/html,application/xhtml+xml',
+        'referer': pageUrl,
+      });
+      final csrf = RegExp(
+                  r'''name=["']csrf_token["'][^>]*value=["']([^"']+)''')
+              .firstMatch(page)
+              ?.group(1) ??
+          RegExp(r'''csrf_token["']?\s*[:=]\s*["']([a-f0-9]{20,})''')
+              .firstMatch(page)
+              ?.group(1) ??
+          RegExp(r'''["']([a-f0-9]{40,})["']''').firstMatch(page)?.group(1);
+      if (csrf == null || csrf.isEmpty) return false;
+      final form = 'empresa=${Uri.encodeQueryComponent(company)}'
+          '&csrf_token=${Uri.encodeQueryComponent(csrf)}'
+          '&origin=portal'
+          '&matricula=${Uri.encodeQueryComponent(matricula)}'
+          '&senha=${Uri.encodeQueryComponent(password)}';
+      final raw = await _externoRequest('POST', '$baseUrl/externo/login',
+          headers: {
+            HttpHeaders.acceptHeader: '*/*',
+            HttpHeaders.contentTypeHeader:
+                'application/x-www-form-urlencoded; charset=UTF-8',
+            'x-requested-with': 'XMLHttpRequest',
+            'origin': baseUrl,
+            'referer': pageUrl,
+          },
+          body: form);
+      String? jwt;
+      try {
+        final parsed = jsonDecode(raw);
+        if (parsed is Map) jwt = parsed['jwt']?.toString();
+      } catch (_) {}
+      jwt ??= _externoCookies['qwert-external'];
+      if (jwt == null || jwt.isEmpty) return false;
+      _externoJwt = jwt;
+      _externoCookies['qwert-external'] = jwt;
+      _externoExp =
+          _jwtExp(jwt) ?? DateTime.now().add(const Duration(hours: 12));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  DateTime? _jwtExp(String jwt) {
+    try {
+      final parts = jwt.split('.');
+      if (parts.length < 2) return null;
+      final payload = jsonDecode(
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      final exp = payload is Map ? payload['exp'] : null;
+      if (exp is int) return DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+    } catch (_) {}
+    return null;
+  }
+
   Future<Map<String, dynamic>> getEspelho(
       String company, String ano, String mes) async {
     final url = '$baseUrl/api-espelho/apuracao/$ano-$mes';
-    return _json(await _get(url, company));
+    final raw = await _externoRequest('GET', url, headers: {
+      HttpHeaders.acceptHeader: 'application/json, text/plain, */*',
+      'origin': 'https://mirror.app.ahgora.com.br',
+      'referer': 'https://mirror.app.ahgora.com.br/',
+    });
+    return _json(raw);
   }
 
   Future<PunchResult> verifyIdentification({
@@ -347,6 +468,7 @@ class PunchRepository {
       // Busca o espelho do ponto para obter a jornada (sugestão de pausa)
       // e as batidas reais do dia.
       try {
+        await _api.ensureExternoLogin(company, enrollment, password);
         final hoje = DateTime.now();
         final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
         // O espelho é por período de apuração: do dia 16 do mês M ao dia 15
