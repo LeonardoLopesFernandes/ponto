@@ -654,7 +654,7 @@ class _TodayPunchesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final apiSug = _sugestoesApi();
     final desloc = _jornadaDeslocada();
-    final slots = _slotsAlinhados(punches, desloc ?? apiSug);
+    final slots = _slotsAlinhados(punches, apiSug ?? desloc);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
