@@ -596,8 +596,14 @@ class _TodayPunchesSection extends StatelessWidget {
     }
     final slots = List<String?>.filled(4, null);
     if (sug == null) {
-      for (var i = 0; i < unicos.length && i < 4; i++) {
-        slots[i] = unicos[i];
+      if (unicos.length == 1) {
+        slots[0] = unicos[0];
+      } else if (unicos.length >= 2) {
+        slots[0] = unicos.first;
+        slots[3] = unicos.last;
+        for (var k = 1; k < unicos.length - 1 && k < 3; k++) {
+          slots[k] = unicos[k];
+        }
       }
       return slots;
     }
