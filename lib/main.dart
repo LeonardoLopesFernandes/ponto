@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/punch_api.dart';
 import 'punch_dialog.dart';
+import 'package:lottie/lottie.dart';
 import 'widgets/ponto_logo_animado.dart';
 
 void main() {
@@ -121,13 +123,19 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late final DateTime _captured;
+  late final AnimationController _clock;
 
   @override
   void initState() {
     super.initState();
     _captured = DateTime.now();
+    _clock = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -139,6 +147,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _clock.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: PontoApp.brand,
@@ -147,7 +161,35 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const PontoLogoAnimado(size: 190),
+              SizedBox(
+                width: 220,
+                height: 220,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Lottie.asset(
+                      'assets/clock_doodle.json',
+                      fit: BoxFit.contain,
+                      controller: _clock,
+                    ),
+                    AnimatedBuilder(
+                      animation: _clock,
+                      builder: (_, __) {
+                        final f = _clock.value * 120;
+                        final op = f < 34
+                            ? 0.0
+                            : (f < 48
+                                ? (f - 34) / 14
+                                : (f >= 102 ? (120 - f) / 18 : 1.0));
+                        return Opacity(
+                          opacity: op.clamp(0.0, 1.0),
+                          child: const _ClockNumbers(size: 220),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 20),
               const Text(
                 'Registrar Ponto',
@@ -164,6 +206,44 @@ class _SplashScreenState extends State<SplashScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ClockNumbers extends StatelessWidget {
+  final double size;
+  const _ClockNumbers({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = size / 512;
+    final r = 66 * s;
+    final fs = 30 * s;
+    final cx = size / 2;
+    final cy = size / 2;
+    return Stack(
+      children: [
+        for (var h = 1; h <= 12; h++)
+          Positioned(
+            left: cx + r * math.cos((h * 30 - 90) * math.pi / 180) - fs * 0.75,
+            top: cy + r * math.sin((h * 30 - 90) * math.pi / 180) - fs * 0.75,
+            child: SizedBox(
+              width: fs * 1.5,
+              height: fs * 1.5,
+              child: Center(
+                child: Text(
+                  '$h',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: fs,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   intl: ^0.20.3
+  lottie: ^3.3.3
   path_drawing: ^1.0.1
   pointycastle: ^4.0.0
   shared_preferences: ^2.5.5
