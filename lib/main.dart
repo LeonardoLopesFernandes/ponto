@@ -137,7 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => HomeScreen(initialNow: _captured),
+          builder: (_) => AuthGate(initialNow: _captured),
         ),
       );
     });
@@ -187,9 +187,241 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
+class AuthGate extends StatefulWidget {
+  final DateTime? initialNow;
+  const AuthGate({super.key, this.initialNow});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _loading = true;
+  bool _logged = false;
+  PunchRepository? _repo;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    var logged = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final repo = PunchRepository(prefs);
+      _repo = repo;
+      final jwt = repo.espelhoJwt;
+      final exp = repo.espelhoExp;
+      final jwtOk = jwt != null &&
+          jwt.isNotEmpty &&
+          (exp == null || exp.isAfter(DateTime.now()));
+      final saved = repo.rememberLogin &&
+          (repo.savedEnrollment?.isNotEmpty ?? false) &&
+          (repo.savedPassword?.isNotEmpty ?? false);
+      logged = jwtOk || saved;
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _logged = logged;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_logged) {
+      return HomeScreen(initialNow: widget.initialNow, repository: _repo);
+    }
+    return LoginScreen(
+      repository: _repo,
+      onLoggedIn: () => setState(() => _logged = true),
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  final VoidCallback onLoggedIn;
+  final PunchRepository? repository;
+  const LoginScreen({super.key, required this.onLoggedIn, this.repository});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _empresa = TextEditingController();
+  final _matricula = TextEditingController();
+  final _senha = TextEditingController();
+  bool _salvar = true;
+  bool _loading = false;
+  String? _erro;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final repo = widget.repository ?? PunchRepository(prefs);
+      if (!mounted) return;
+      setState(() {
+        _empresa.text =
+            prefs.getString('company_code') ?? AppConfig.defaultCompanyCode;
+        _matricula.text = repo.savedEnrollment ?? '';
+        _senha.text = repo.savedPassword ?? '';
+        _salvar = repo.rememberLogin || repo.savedPassword == null;
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _empresa.dispose();
+    _matricula.dispose();
+    _senha.dispose();
+    super.dispose();
+  }
+
+  Future<void> _entrar() async {
+    final empresa = _empresa.text.trim();
+    final matricula = _matricula.text.trim();
+    final senha = _senha.text;
+    if (empresa.isEmpty || matricula.isEmpty || senha.isEmpty) {
+      setState(() => _erro = 'Preencha empresa, matrícula e senha.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _erro = null;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final repo = widget.repository ?? PunchRepository(prefs);
+      repo.setCompanyCode(empresa);
+      final esp = await repo.espelhoAtual(
+          enrollment: matricula, password: senha, persist: _salvar);
+      if (!mounted) return;
+      if (esp == null) {
+        setState(() {
+          _loading = false;
+          _erro = 'Não foi possível entrar. Verifique os dados e tente novamente.';
+        });
+        return;
+      }
+      if (_salvar) {
+        repo.saveEnrollment(matricula);
+        repo.savePassword(senha);
+        repo.setRememberLogin(true);
+      } else {
+        repo.setRememberLogin(false);
+        repo.clearPassword();
+      }
+      if (!mounted) return;
+      widget.onLoggedIn();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _erro = 'Falha de conexão. Tente novamente.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 24),
+              const Icon(Icons.access_time, size: 72, color: PontoApp.brand),
+              const SizedBox(height: 12),
+              const Text(
+                'Registrar Ponto',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: PontoApp.brand),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Entre com os dados da empresa',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 28),
+              TextField(
+                controller: _empresa,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Código da empresa',
+                    border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _matricula,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Matrícula', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _senha,
+                obscureText: true,
+                decoration: const InputDecoration(
+                    labelText: 'Senha', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                value: _salvar,
+                onChanged: (v) => setState(() => _salvar = v ?? false),
+                title: const Text('Salvar login'),
+                subtitle: const Text(
+                    'Na próxima vez não precisa digitar',
+                    style: TextStyle(fontSize: 12)),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              if (_erro != null) ...[
+                const SizedBox(height: 8),
+                Text(_erro!,
+                    style: const TextStyle(color: PontoApp.error)),
+              ],
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _loading ? null : _entrar,
+                child: _loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('ENTRAR'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class HomeScreen extends StatefulWidget {
   final DateTime? initialNow;
-  const HomeScreen({super.key, this.initialNow});
+  final PunchRepository? repository;
+  const HomeScreen({super.key, this.initialNow, this.repository});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -224,10 +456,30 @@ class _HomeScreenState extends State<HomeScreen> {
     if (prefs == null) return;
     final p = prefs;
     setState(() {
-      _repository = PunchRepository(p);
+      _repository = widget.repository ?? PunchRepository(p);
       _todayPunches = _loadTodayPunches(p);
+      _jornada = _loadJornada(p);
+      _sugestoes = _loadSugestoes(p);
     });
     _atualizarEspelho();
+  }
+
+  String? _loadJornada(SharedPreferences prefs) {
+    final v = prefs.getString('jornada_$_todayKey');
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  List<String> _loadSugestoes(SharedPreferences prefs) {
+    final raw = prefs.getString('sugestoes_$_todayKey') ?? '';
+    return raw.isEmpty ? [] : raw.split('|');
+  }
+
+  void _persistEspelho(PunchResult esp) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('jornada_$_todayKey', esp.jornada ?? '');
+      prefs.setString('sugestoes_$_todayKey', esp.sugestoes.join('|'));
+      prefs.setString('punches_$_todayKey', _todayPunches.join(','));
+    });
   }
 
   Future<void> _atualizarEspelho() async {
@@ -247,6 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _sugestoes = esp.sugestoes;
       }
     });
+    _persistEspelho(esp);
   }
 
   @override
@@ -323,6 +576,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         });
         _persistTodayPunches();
+        _persistEspelho(punch);
         _showSuccessDialog(punch);
       }
     } else if (result != null && !result.ok) {

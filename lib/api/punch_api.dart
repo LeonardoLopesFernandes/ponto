@@ -83,6 +83,21 @@ class AhgoraApi {
     _sessionInitialized = false;
   }
 
+  String? get externoJwt => _externoJwt;
+  DateTime? get externoExp => _externoExp;
+
+  void restoreExternoJwt(String? jwt, DateTime? exp) {
+    if (jwt == null || jwt.isEmpty) {
+      _externoJwt = null;
+      _externoExp = null;
+      _externoCookies.remove('qwert-external');
+      return;
+    }
+    _externoJwt = jwt;
+    _externoExp = exp;
+    _externoCookies['qwert-external'] = jwt;
+  }
+
   String _cookieHeader(String? company) {
     if (company != null && company.isNotEmpty) {
       _cookies['company'] = company;
@@ -390,6 +405,22 @@ class PunchRepository {
 
   String? get savedPassword => _prefs.getString('password');
 
+  String? get espelhoJwt => _prefs.getString('espelho_jwt');
+  DateTime? get espelhoExp {
+    final ms = _prefs.getInt('espelho_exp');
+    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  void saveEspelhoJwt(String? jwt, DateTime? exp) {
+    if (jwt == null || jwt.isEmpty) {
+      _prefs.remove('espelho_jwt');
+      _prefs.remove('espelho_exp');
+      return;
+    }
+    _prefs.setString('espelho_jwt', jwt);
+    if (exp != null) _prefs.setInt('espelho_exp', exp.millisecondsSinceEpoch);
+  }
+
   bool get rememberLogin => _prefs.getBool('remember_login') ?? false;
 
   void setRememberLogin(bool value) => _prefs.setBool('remember_login', value);
@@ -489,16 +520,51 @@ class PunchRepository {
     return PunchFlowResult.failure(_mapFailure(result.reason));
   }
 
-  /// Busca o espelho do dia (jornada, previstas e batidas reais), usando o
-  /// login externo com matrícula/senha (salvas ou informadas).
-  Future<PunchResult?> espelhoAtual({String? enrollment, String? password}) async {
+  /// Busca o espelho do dia (jornada, previstas e batidas reais). Reaproveita
+  /// o JWT salvo; se não houver, entra com matrícula/senha.
+  Future<PunchResult?> espelhoAtual({
+    String? enrollment,
+    String? password,
+    bool? persist,
+  }) async {
     final matricula = (enrollment ?? savedEnrollment ?? '').trim();
     final senha = password ?? savedPassword ?? '';
+    final company = companyCode;
+
+    final jwt = espelhoJwt;
+    final exp = espelhoExp;
+    final jwtValido = jwt != null &&
+        jwt.isNotEmpty &&
+        (exp == null ||
+            exp.isAfter(DateTime.now().add(const Duration(minutes: 5))));
+    if (jwtValido) {
+      _api.restoreExternoJwt(jwt, exp);
+      final r = await _buscarEspelho(company);
+      if (r != null) return r;
+      // JWT pode ter sido revogado; tenta logar de novo se tiver senha.
+      _api.restoreExternoJwt(null, null);
+    }
+    // JWT obtido nesta sessão (login feito agora, mesmo sem "salvar").
+    final memJwt = _api.externoJwt;
+    final memExp = _api.externoExp;
+    if (memJwt != null &&
+        memJwt.isNotEmpty &&
+        (memExp == null ||
+            memExp.isAfter(DateTime.now().add(const Duration(minutes: 5))))) {
+      final r = await _buscarEspelho(company);
+      if (r != null) return r;
+    }
     if (matricula.isEmpty || senha.isEmpty) return null;
+    final logged = await _api.ensureExternoLogin(company, matricula, senha);
+    if (!logged) return null;
+    if (persist ?? rememberLogin) {
+      saveEspelhoJwt(_api.externoJwt, _api.externoExp);
+    }
+    return _buscarEspelho(company);
+  }
+
+  Future<PunchResult?> _buscarEspelho(String company) async {
     try {
-      final company = companyCode;
-      final logged = await _api.ensureExternoLogin(company, matricula, senha);
-      if (!logged) return null;
       final hoje = DateTime.now();
       final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
       // O espelho é por período de apuração: do dia 16 do mês M ao dia 15
@@ -560,7 +626,6 @@ class PunchRepository {
       return null;
     }
   }
-
 
   String _mapFailure(String? reason) {
     switch (reason) {
