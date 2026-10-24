@@ -563,51 +563,14 @@ class _TodayPunchesSection extends StatelessWidget {
     return out.every((s) => s.isEmpty) ? null : out;
   }
 
-  /// Jornada contratual deslocada para começar na 1ª batida (ou na 1ª
-  /// PREVISTA). Serve para alinhar as batidas e preencher as pausas quando o
-  /// fim de jornada é registrado. Ex.: início 13:28 -> 17:28 / 18:58 / 22:18.
-  List<String>? _jornadaDeslocada() {
-    final jor = _jornadaSlots();
-    if (jor == null) return null;
-    final api = sugestoes.take(4).map(_norm).toList();
-    final offset = _deslocamentoMinutos(jor, api);
-    return offset == null
-        ? jor
-        : jor.map((t) => _addMinutos(t, offset)).toList();
-  }
-
-  /// Minutos a somar na jornada para alinhá-la ao início registrado.
-  /// Prefere o deslocamento indicado pela 1ª batida PREVISTA da API; sem
-  /// PREVISTA, usa a primeira batida real (só com 2+ batidas, para um fim
-  /// isolado não cair no início).
-  int? _deslocamentoMinutos(List<String> jor, List<String> api) {
-    // Alinha a jornada à 1ª batida REAL (mesmo com só 1 registro), para o
-    // "fim de jornada" cair no slot certo. Só usa a PREVISTA se não houver
-    // nenhuma batida real ainda.
-    if (punches.isNotEmpty) {
-      final ordenadas = punches.map(_norm).toList()..sort();
-      return _toMin(ordenadas.first) - _toMin(jor[0]);
-    }
-    for (var i = 0; i < 4 && i < api.length; i++) {
-      if (api[i].isNotEmpty) return _toMin(api[i]) - _toMin(jor[i]);
-    }
-    return null;
-  }
-
-  static String _addMinutos(String t, int delta) {
-    final v = ((_toMin(t) + delta) % 1440 + 1440) % 1440;
-    return '${(v ~/ 60).toString().padLeft(2, '0')}:'
-        '${(v % 60).toString().padLeft(2, '0')}';
-  }
+  /// Previstas do espelho: os slots da jornada, exatamente como o site
+  /// mostra (ex.: 08:50 / 12:50 / 14:20 / 17:40). Null quando não há 4
+  /// horários (ex.: jornada "DSR").
+  List<String>? _jornadaPrevista() => _jornadaSlots();
 
   List<String>? _jornadaSlots() {
-    final j = jornada;
-    if (j == null || j.isEmpty) {
-      final domingo = DateTime.now().weekday == DateTime.sunday;
-      return domingo
-          ? const ['00:00', '03:00', '03:15', '06:15']
-          : const ['00:00', '03:40', '05:10', '08:50'];
-    }
+    final j = jornada?.trim() ?? '';
+    if (j.isEmpty) return null;
     final p = j
         .split('|')
         .map((s) => s.trim())
@@ -651,6 +614,12 @@ class _TodayPunchesSection extends StatelessWidget {
     }
     final livres = <int>{0, 1, 2, 3};
     final ordenadas = [...unicos]..sort();
+    if (ordenadas.length >= 4) {
+      for (var i = 0; i < 4; i++) {
+        slots[i] = ordenadas[i];
+      }
+      return slots;
+    }
     for (final p in ordenadas) {
       if (livres.isEmpty) break;
       var best = -1;
@@ -673,8 +642,8 @@ class _TodayPunchesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final apiSug = _sugestoesApi();
-    final desloc = _jornadaDeslocada();
-    final slots = _slotsAlinhados(punches, apiSug ?? desloc);
+    final previstas = _jornadaPrevista();
+    final slots = _slotsAlinhados(punches, apiSug ?? previstas);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -770,14 +739,16 @@ class _TodayPunchesSection extends StatelessWidget {
                 final t = slots[i];
                 final apiVal =
                     (apiSug != null && i < apiSug.length) ? apiSug[i] : '';
-                final deslocVal =
-                    (desloc != null && i < desloc.length) ? desloc[i] : '';
+                final prevVal =
+                    (previstas != null && i < previstas.length)
+                        ? previstas[i]
+                        : '';
                 // Logo após o 1º registro, já prevê as pausas (e o fim) com a
-                // jornada deslocada (ou a PREVISTA da API), preenchendo os
+                // jornada prevista do espelho (igual ao site), preenchendo os
                 // círculos em azul. Após registrar, o valor real substitui.
                 final fimOk = punches.length >= 2;
                 final isPausa = i == 1 || i == 2;
-                final sugVal = apiVal.isNotEmpty ? apiVal : deslocVal;
+                final sugVal = apiVal.isNotEmpty ? apiVal : prevVal;
                 final sugOK = sugVal.isNotEmpty && (!isPausa || fimOk);
                 final preenchido = t != null || (sugOK && fimOk);
                 final hora = t != null

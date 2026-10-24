@@ -348,34 +348,29 @@ class PunchRepository {
       // e as batidas reais do dia.
       try {
         final hoje = DateTime.now();
-        final espelho = await _api.getEspelho(
-          company,
-          '${hoje.year}',
-          '${hoje.month.toString().padLeft(2, '0')}',
-        );
-        ultimoEspelhoJson = jsonEncode(espelho);
         final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
-        print('ESPELHO_API $hojeKey: $espelho');
-        final dias = espelho['dias'];
+        // O espelho é por período de apuração: do dia 16 do mês M ao dia 15
+        // do mês M+1, sob a referência "M+1". Ex.: 24/10 -> "2026-11".
+        final refs = hoje.day >= 16 ? [1, 0, 2] : [0, 1, -1];
+        Map<String, dynamic>? espelho;
         Map? dia;
-        if (dias is Map) {
-          final d = dias[hojeKey];
-          if (d is Map) dia = Map.from(d);
-        } else if (dias is List) {
-          for (final d in dias) {
-            if (d is Map &&
-                (d['data']?.toString() == hojeKey ||
-                    d['dia']?.toString() == hojeKey ||
-                    d['date']?.toString() == hojeKey)) {
-              dia = d;
-              break;
-            }
+        for (final off in refs) {
+          final ref = DateTime(hoje.year, hoje.month + off);
+          final e = await _api.getEspelho(
+            company,
+            '${ref.year}',
+            '${ref.month.toString().padLeft(2, '0')}',
+          );
+          espelho ??= e;
+          final dias = e['dias'];
+          if (dias is Map && dias[hojeKey] is Map) {
+            espelho = e;
+            dia = Map.from(dias[hojeKey] as Map);
+            break;
           }
         }
-        final jornada = (dia?['jornada'] ??
-                dia?['jornadaPrevista'] ??
-                dia?['escala'] ??
-                '')
+        ultimoEspelhoJson = jsonEncode(espelho ?? <String, dynamic>{});
+        final jornada = (dia?['jornada'] ?? dia?['jornadaPrevista'] ?? '')
             .toString();
         // O espelho traz as batidas por slot: as reais vêm com tipo
         // "ORIGINAL" (ou "MANUAL"/"registrado") e as sugestões com tipo
