@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'rsa_crypto.dart';
 
+/// Último JSON do espelho, para diagnóstico na tela inicial.
+String? ultimoEspelhoJson;
+
 abstract class AppConfig {
   static const defaultCompanyCode = 'a474114';
   static const appTitle = 'Registrar Ponto';
@@ -350,6 +353,7 @@ class PunchRepository {
           '${hoje.year}',
           '${hoje.month.toString().padLeft(2, '0')}',
         );
+        ultimoEspelhoJson = jsonEncode(espelho);
         final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
         print('ESPELHO_API $hojeKey: $espelho');
         final dias = espelho['dias'];

@@ -658,10 +658,54 @@ class _TodayPunchesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Registros de hoje',
-          style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A202C)),
+        Row(
+          children: [
+            const Text(
+              'Registros de hoje',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1A202C)),
+            ),
+            const Spacer(),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Diagnóstico do espelho',
+              icon: const Icon(Icons.bug_report_outlined,
+                  size: 18, color: Colors.black45),
+              onPressed: () {
+                final txt = ultimoEspelhoJson ?? 'Sem dados do espelho';
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Espelho (diagnóstico)'),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: SingleChildScrollView(
+                        child: SelectableText(txt,
+                            style: const TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: txt));
+                          Navigator.of(ctx).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Espelho copiado')));
+                        },
+                        child: const Text('Copiar'),
+                      ),
+                      TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Fechar')),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         if (punches.isEmpty)
