@@ -327,33 +327,6 @@ class _PunchDialogState extends State<PunchDialog> {
             ],
           ),
         ),
-        if (_pausaSugerida() != null) ...[
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.coffee_outlined,
-                    color: PontoApp.brand, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'Pausa sugerida: ${_pausaSugerida()}',
-                  style: const TextStyle(
-                    color: PontoApp.brand,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
