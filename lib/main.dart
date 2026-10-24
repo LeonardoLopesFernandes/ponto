@@ -775,7 +775,11 @@ class _TodayPunchesSection extends StatelessWidget {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _TimeCircle(time: hora, sugerido: !preenchido),
+                    _TimeCircle(
+                      time: hora,
+                      sugerido: !preenchido,
+                      previsto: t == null && sugOK,
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       _labels[i],
@@ -799,11 +803,16 @@ class _TodayPunchesSection extends StatelessWidget {
 class _TimeCircle extends StatelessWidget {
   final String time;
   final bool sugerido;
-  const _TimeCircle({required this.time, this.sugerido = false});
+  final bool previsto;
+  const _TimeCircle(
+      {required this.time, this.sugerido = false, this.previsto = false});
 
   @override
   Widget build(BuildContext context) {
     const brand = Color(0xFF0300A2);
+    const prevBg = Color(0xFFE5E7EB);
+    const prevText = Color(0xFF475569);
+    const prevBorder = Color(0xFFC7D0DB);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -811,15 +820,18 @@ class _TimeCircle extends StatelessWidget {
           width: 68,
           height: 68,
           decoration: BoxDecoration(
-            color: sugerido ? Colors.white : brand,
+            color: previsto ? prevBg : (sugerido ? Colors.white : brand),
             shape: BoxShape.circle,
-            border: sugerido ? Border.all(color: brand, width: 2) : null,
+            border: previsto
+                ? Border.all(color: prevBorder, width: 1.5)
+                : (sugerido ? Border.all(color: brand, width: 2) : null),
           ),
           alignment: Alignment.center,
           child: Text(
             time,
             style: TextStyle(
-              color: sugerido ? brand : Colors.white,
+              color:
+                  previsto ? prevText : (sugerido ? brand : Colors.white),
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -832,15 +844,21 @@ class _TimeCircle extends StatelessWidget {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: sugerido ? brand : Colors.white,
+              color:
+                  previsto ? Colors.white : (sugerido ? brand : Colors.white),
               shape: BoxShape.circle,
               border: Border.all(
-                  color: sugerido ? Colors.white : brand),
+                  color: previsto
+                      ? prevBorder
+                      : (sugerido ? Colors.white : brand)),
             ),
             child: Icon(
-                sugerido ? Icons.schedule : Icons.check,
+                previsto
+                    ? Icons.schedule
+                    : (sugerido ? Icons.schedule : Icons.check),
                 size: 14,
-                color: sugerido ? Colors.white : brand),
+                color:
+                    previsto ? prevText : (sugerido ? Colors.white : brand)),
           ),
         ),
       ],
