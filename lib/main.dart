@@ -9,6 +9,7 @@ import 'api/punch_api.dart';
 import 'punch_dialog.dart';
 import 'package:lottie/lottie.dart';
 import 'widgets/ponto_logo_animado.dart';
+import 'widgets/animated_lock.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -396,12 +397,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _senha = TextEditingController();
   bool _salvar = true;
   bool _loading = false;
+  bool _showPassword = false;
   String? _erro;
+  final FocusNode _matriculaFocus = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _matriculaFocus.addListener(_onMatriculaFocus);
     _load();
+  }
+
+  void _onMatriculaFocus() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
@@ -421,6 +429,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _matriculaFocus.removeListener(_onMatriculaFocus);
+    _matriculaFocus.dispose();
     _empresa.dispose();
     _matricula.dispose();
     _senha.dispose();
@@ -509,16 +519,33 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 12),
               TextField(
                 controller: _matricula,
+                focusNode: _matriculaFocus,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: 'Matrícula', border: OutlineInputBorder()),
+                decoration: InputDecoration(
+                    labelText: 'Matrícula',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline,
+                        color: _matriculaFocus.hasFocus
+                            ? PontoApp.brand
+                            : Colors.black45)),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _senha,
-                obscureText: true,
-                decoration: const InputDecoration(
-                    labelText: 'Senha', border: OutlineInputBorder()),
+                obscureText: !_showPassword,
+                decoration: InputDecoration(
+                    labelText: 'Senha',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: IconButton(
+                      tooltip:
+                          _showPassword ? 'Ocultar senha' : 'Mostrar senha',
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                      icon: AnimatedLockIcon(
+                        locked: !_showPassword,
+                        color: PontoApp.brand,
+                      ),
+                    )),
               ),
               const SizedBox(height: 8),
               CheckboxListTile(

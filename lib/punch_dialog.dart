@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api/punch_api.dart';
 import 'main.dart';
+import 'widgets/animated_lock.dart';
 
 Widget centeredActions(List<Widget> buttons) {
   if (buttons.length == 1) {
@@ -51,6 +52,7 @@ class _PunchDialogState extends State<PunchDialog> {
   bool _stepConfirm = false;
   bool _loading = false;
   bool _showPassword = false;
+  final FocusNode _enrollmentFocus = FocusNode();
   DateTime _now = DateTime.now();
   Timer? _clockTimer;
 
@@ -60,6 +62,7 @@ class _PunchDialogState extends State<PunchDialog> {
     _enrollmentCtl = TextEditingController(text: widget.initialEnrollment);
     _passwordCtl = TextEditingController(text: widget.initialPassword);
     _remember = widget.initialRemember;
+    _enrollmentFocus.addListener(_onEnrollmentFocus);
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
@@ -68,9 +71,15 @@ class _PunchDialogState extends State<PunchDialog> {
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _enrollmentFocus.removeListener(_onEnrollmentFocus);
+    _enrollmentFocus.dispose();
     _enrollmentCtl.dispose();
     _passwordCtl.dispose();
     super.dispose();
+  }
+
+  void _onEnrollmentFocus() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _confirm() async {
@@ -188,10 +197,14 @@ class _PunchDialogState extends State<PunchDialog> {
         const SizedBox(height: 14),
         TextField(
           controller: _enrollmentCtl,
+          focusNode: _enrollmentFocus,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Matrícula (prontuário)',
-            prefixIcon: Icon(Icons.person_outline),
+            prefixIcon: Icon(Icons.person_outline,
+                color: _enrollmentFocus.hasFocus
+                    ? PontoApp.brand
+                    : Colors.black45),
           ),
         ),
         const SizedBox(height: 12),
@@ -201,14 +214,13 @@ class _PunchDialogState extends State<PunchDialog> {
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: 'Senha',
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: TextButton(
+            prefixIcon: IconButton(
+              tooltip: _showPassword ? 'Ocultar senha' : 'Mostrar senha',
               onPressed: () => setState(() => _showPassword = !_showPassword),
-              style: TextButton.styleFrom(
-                foregroundColor: PontoApp.brand,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              icon: AnimatedLockIcon(
+                locked: !_showPassword,
+                color: PontoApp.brand,
               ),
-              child: Text(_showPassword ? 'Ocultar' : 'Mostrar'),
             ),
           ),
         ),
