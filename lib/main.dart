@@ -683,12 +683,14 @@ class _TodayPunchesSection extends StatelessWidget {
                 // Logo após o 1º registro, já prevê as pausas (e o fim) com a
                 // jornada deslocada (ou a PREVISTA da API), preenchendo os
                 // círculos em azul. Após registrar, o valor real substitui.
-                final sugestao = apiVal.isNotEmpty ? apiVal : deslocVal;
-                final completa = t == null && sugestao.isNotEmpty;
-                final preenchido = t != null || completa;
+                final fimOk = punches.length >= 2;
+                final isPausa = i == 1 || i == 2;
+                final sugVal = apiVal.isNotEmpty ? apiVal : deslocVal;
+                final sugOK = sugVal.isNotEmpty && (!isPausa || fimOk);
+                final preenchido = t != null || (sugOK && fimOk);
                 final hora = t != null
                     ? _norm(t)
-                    : (sugestao.isNotEmpty ? sugestao : '--:--');
+                    : (sugOK ? sugVal : '--:--');
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
