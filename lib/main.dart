@@ -766,7 +766,13 @@ class _TodayPunchesSection extends StatelessWidget {
                 // Logo após o 1º registro, já prevê as pausas (e o fim) com a
                 // jornada prevista do espelho (igual ao site), preenchendo os
                 // círculos em azul. Após registrar, o valor real substitui.
-                final sugVal = apiSug != null ? apiVal : prevVal;
+                // Antes da batida final mostra só o que o site manda (pausas
+                // em branco); depois da final preenche as pausas com a
+                // jornada, caso o site ainda não tenha assinalado.
+                final finalOk = punches.length >= 2;
+                final sugVal = apiVal.isNotEmpty
+                    ? apiVal
+                    : (apiSug == null || finalOk ? prevVal : '');
                 final sugOK = sugVal.isNotEmpty;
                 final preenchido = t != null || sugOK;
                 final hora = t != null

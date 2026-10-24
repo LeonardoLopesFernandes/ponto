@@ -467,13 +467,19 @@ class PunchRepository {
     if (result.ok) {
       final esp = await espelhoAtual(enrollment: enrollment, password: password);
       if (esp != null) {
+        // O espelho pode levar alguns segundos para refletir a batida
+        // recém-registrada; une com a resposta do registro para não perder.
+        final merged = <String>{
+          ...result.batidasDia,
+          ...esp.batidasDia,
+        }.toList()
+          ..sort();
         return PunchFlowResult.success(PunchResult(
           ok: true,
           day: result.day,
           time: result.time,
           employeeName: result.employeeName,
-          batidasDia:
-              esp.batidasDia.isNotEmpty ? esp.batidasDia : result.batidasDia,
+          batidasDia: merged.isNotEmpty ? merged : result.batidasDia,
           jornada: esp.jornada,
           sugestoes: esp.sugestoes,
         ));
