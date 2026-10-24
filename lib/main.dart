@@ -426,6 +426,25 @@ class _ClockCard extends StatelessWidget {
   final DateTime now;
   const _ClockCard({required this.now});
 
+  static TextSpan _digits(String d) => TextSpan(
+        text: d,
+        style: const TextStyle(
+          color: PontoApp.brand,
+          fontSize: 58,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1,
+        ),
+      );
+
+  static TextSpan _letter(String l) => TextSpan(
+        text: l,
+        style: const TextStyle(
+          color: PontoApp.brand,
+          fontSize: 26,
+          fontWeight: FontWeight.w400,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -466,14 +485,15 @@ class _ClockCard extends StatelessWidget {
             style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
-          Text(
-            clockHmS(now),
-            style: const TextStyle(
-              color: PontoApp.brand,
-              fontSize: 58,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -1,
-            ),
+          Text.rich(
+            TextSpan(children: [
+              _digits(now.hour.toString().padLeft(2, '0')),
+              _letter('h'),
+              _digits(now.minute.toString().padLeft(2, '0')),
+              _letter('m'),
+              _digits(now.second.toString().padLeft(2, '0')),
+              _letter('s'),
+            ]),
           ),
         ],
       ),
