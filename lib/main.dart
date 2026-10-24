@@ -162,8 +162,8 @@ class _SplashScreenState extends State<SplashScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                width: 220,
-                height: 220,
+                width: 300,
+                height: 300,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -183,29 +183,96 @@ class _SplashScreenState extends State<SplashScreen>
                                 : (f >= 102 ? (120 - f) / 18 : 1.0));
                         return Opacity(
                           opacity: op.clamp(0.0, 1.0),
-                          child: const _ClockNumbers(size: 220),
+                          child: const _ClockNumbers(size: 300),
                         );
                       },
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Registrar Ponto',
+              const SizedBox(height: 24),
+              const TypewriterText(
+                text: 'Registrar Ponto',
+                startDelay: Duration(milliseconds: 700),
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 16),
-              const CircularProgressIndicator(color: Colors.white),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class TypewriterText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final Duration startDelay;
+  final Duration charDuration;
+  const TypewriterText({
+    super.key,
+    required this.text,
+    required this.style,
+    this.startDelay = Duration.zero,
+    this.charDuration = const Duration(milliseconds: 80),
+  });
+
+  @override
+  State<TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<TypewriterText>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: widget.charDuration * widget.text.length,
+    );
+    if (widget.startDelay == Duration.zero) {
+      _c.forward();
+    } else {
+      Future.delayed(widget.startDelay, () {
+        if (mounted) _c.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        final n = (widget.text.length * _c.value)
+            .floor()
+            .clamp(0, widget.text.length);
+        final done = n >= widget.text.length;
+        final typed =
+            '${widget.text.substring(0, n)}${done ? '' : '|'}';
+        return Stack(
+          children: [
+            Opacity(
+              opacity: 0,
+              child: Text(widget.text, style: widget.style),
+            ),
+            Text(typed, style: widget.style),
+          ],
+        );
+      },
     );
   }
 }
