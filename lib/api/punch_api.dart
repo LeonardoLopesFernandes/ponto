@@ -351,19 +351,41 @@ class PunchRepository {
           '${hoje.month.toString().padLeft(2, '0')}',
         );
         final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
-        final dia = espelho['dias']?[hojeKey];
-        final jornada = dia?['jornada']?.toString() ?? '';
+        print('ESPELHO_API $hojeKey: $espelho');
+        final dias = espelho['dias'];
+        Map? dia;
+        if (dias is Map) {
+          final d = dias[hojeKey];
+          if (d is Map) dia = Map.from(d);
+        } else if (dias is List) {
+          for (final d in dias) {
+            if (d is Map &&
+                (d['data']?.toString() == hojeKey ||
+                    d['dia']?.toString() == hojeKey ||
+                    d['date']?.toString() == hojeKey)) {
+              dia = d;
+              break;
+            }
+          }
+        }
+        final jornada = (dia?['jornada'] ??
+                dia?['jornadaPrevista'] ??
+                dia?['escala'] ??
+                '')
+            .toString();
         // O espelho traz as batidas por slot: as reais vêm com tipo
         // "ORIGINAL" (ou "MANUAL"/"registrado") e as sugestões com tipo
         // "PREVISTA". Mantemos as sugestões alinhadas à posição do slot.
         final espelhoBatidas = <String>[];
         final espelhoSugestoes = <String>[];
-        final arr = dia?['batidas'];
+        final arr = dia?['batidas'] ?? dia?['marcacoes'] ?? dia?['registros'];
         if (arr is List) {
           for (final b in arr) {
             if (b is! Map) continue;
-            final hora = b['hora']?.toString() ?? '';
-            final tipo = (b['tipo']?.toString() ?? '').toUpperCase();
+            final hora =
+                (b['hora'] ?? b['time'] ?? b['batida'] ?? '').toString();
+            final tipo =
+                (b['tipo'] ?? b['type'] ?? '').toString().toUpperCase();
             if (tipo == 'PREVISTA') {
               // Mantém a posição do slot (índice do array) na lista.
               espelhoSugestoes.add(hora.isEmpty ? '' : formatPunchTime(hora));
