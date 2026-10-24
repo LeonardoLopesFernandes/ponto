@@ -453,3 +453,8 @@ String formatDatePt(DateTime d) {
 
 String clockHm(DateTime t) => DateFormat('HH:mm').format(t);
 String clockHms(DateTime t) => DateFormat('HH:mm:ss').format(t);
+
+String clockHmS(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}h'
+    '${t.minute.toString().padLeft(2, '0')}m'
+    '${t.second.toString().padLeft(2, '0')}s';

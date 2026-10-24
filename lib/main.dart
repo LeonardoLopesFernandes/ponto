@@ -444,13 +444,30 @@ class _ClockCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 22),
       child: Column(
         children: [
+          const Text(
+            'Olá!',
+            style: TextStyle(
+                color: Color(0xFF1A202C),
+                fontSize: 20,
+                fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Não perca mais tempo, registre o seu ponto!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 14,
+                fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 12),
           Text(
             formatDatePt(now),
             style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
           Text(
-            clockHms(now),
+            clockHmS(now),
             style: const TextStyle(
               color: PontoApp.brand,
               fontSize: 58,
@@ -565,7 +582,12 @@ class _TodayPunchesSection extends StatelessWidget {
 
   List<String>? _jornadaSlots() {
     final j = jornada;
-    if (j == null || j.isEmpty) return null;
+    if (j == null || j.isEmpty) {
+      final domingo = DateTime.now().weekday == DateTime.sunday;
+      return domingo
+          ? const ['00:00', '03:00', '03:15', '06:15']
+          : const ['00:00', '03:40', '05:10', '08:50'];
+    }
     final p = j
         .split('|')
         .map((s) => s.trim())
