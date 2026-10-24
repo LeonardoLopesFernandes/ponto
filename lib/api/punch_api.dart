@@ -373,8 +373,9 @@ class PunchRepository {
         final jornada = (dia?['jornada'] ?? dia?['jornadaPrevista'] ?? '')
             .toString();
         // O espelho traz as batidas por slot: as reais vêm com tipo
-        // "ORIGINAL" (ou "MANUAL"/"registrado") e as sugestões com tipo
-        // "PREVISTA". Mantemos as sugestões alinhadas à posição do slot.
+        // "ORIGINAL" e as pré-assinaladas pelo site (horários de pausa) vêm
+        // como "MANUAL" com tipoIdentificador "I" — não são batidas reais.
+        // Mantemos as previstas alinhadas à posição do slot.
         final espelhoBatidas = <String>[];
         final espelhoSugestoes = <String>[];
         final arr = dia?['batidas'] ?? dia?['marcacoes'] ?? dia?['registros'];
@@ -385,7 +386,11 @@ class PunchRepository {
                 (b['hora'] ?? b['time'] ?? b['batida'] ?? '').toString();
             final tipo =
                 (b['tipo'] ?? b['type'] ?? '').toString().toUpperCase();
-            if (tipo == 'PREVISTA') {
+            final ident =
+                (b['tipoIdentificador'] ?? b['identificador'] ?? '')
+                    .toString()
+                    .toUpperCase();
+            if (tipo == 'PREVISTA' || ident == 'I') {
               // Mantém a posição do slot (índice do array) na lista.
               espelhoSugestoes.add(hora.isEmpty ? '' : formatPunchTime(hora));
             } else {
