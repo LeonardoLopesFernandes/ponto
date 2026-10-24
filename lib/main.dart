@@ -214,12 +214,14 @@ class TypewriterText extends StatefulWidget {
   final TextStyle style;
   final Duration startDelay;
   final Duration charDuration;
+  final String? onceKey;
   const TypewriterText({
     super.key,
     required this.text,
     required this.style,
     this.startDelay = Duration.zero,
     this.charDuration = const Duration(milliseconds: 80),
+    this.onceKey,
   });
 
   @override
@@ -228,6 +230,7 @@ class TypewriterText extends StatefulWidget {
 
 class _TypewriterTextState extends State<TypewriterText>
     with SingleTickerProviderStateMixin {
+  static final Set<String> _played = <String>{};
   late final AnimationController _c;
 
   @override
@@ -237,6 +240,12 @@ class _TypewriterTextState extends State<TypewriterText>
       vsync: this,
       duration: widget.charDuration * widget.text.length,
     );
+    final key = widget.onceKey;
+    if (key != null && _played.contains(key)) {
+      _c.value = 1.0;
+      return;
+    }
+    if (key != null) _played.add(key);
     if (widget.startDelay == Duration.zero) {
       _c.forward();
     } else {
@@ -793,14 +802,16 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
               _GradientButton(
                 onPressed: _openPunchDialog,
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.schedule, size: 22, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text(
-                      'REGISTRE SEU PONTO',
-                      style: TextStyle(
+                    const Icon(Icons.schedule, size: 22, color: Colors.white),
+                    const SizedBox(width: 12),
+                    TypewriterText(
+                      text: 'REGISTRE SEU PONTO',
+                      onceKey: 'badge_registrar',
+                      startDelay: const Duration(milliseconds: 300),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
