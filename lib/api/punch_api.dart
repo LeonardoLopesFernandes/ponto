@@ -465,80 +465,96 @@ class PunchRepository {
     );
 
     if (result.ok) {
-      // Busca o espelho do ponto para obter a jornada (sugestão de pausa)
-      // e as batidas reais do dia.
-      try {
-        await _api.ensureExternoLogin(company, enrollment, password);
-        final hoje = DateTime.now();
-        final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
-        // O espelho é por período de apuração: do dia 16 do mês M ao dia 15
-        // do mês M+1, sob a referência "M+1". Ex.: 24/10 -> "2026-11".
-        final refs = hoje.day >= 16 ? [1, 0, 2] : [0, 1, -1];
-        Map<String, dynamic>? espelho;
-        Map? dia;
-        for (final off in refs) {
-          final ref = DateTime(hoje.year, hoje.month + off);
-          final e = await _api.getEspelho(
-            company,
-            '${ref.year}',
-            '${ref.month.toString().padLeft(2, '0')}',
-          );
-          espelho ??= e;
-          final dias = e['dias'];
-          if (dias is Map && dias[hojeKey] is Map) {
-            espelho = e;
-            dia = Map.from(dias[hojeKey] as Map);
-            break;
-          }
-        }
-        ultimoEspelhoJson = jsonEncode(espelho ?? <String, dynamic>{});
-        final jornada = (dia?['jornada'] ?? dia?['jornadaPrevista'] ?? '')
-            .toString();
-        // O espelho traz as batidas por slot: as reais vêm com tipo
-        // "ORIGINAL" e as pré-assinaladas pelo site (horários de pausa) vêm
-        // como "MANUAL" com tipoIdentificador "I" — não são batidas reais.
-        // Mantemos as previstas alinhadas à posição do slot.
-        final espelhoBatidas = <String>[];
-        final espelhoSugestoes = <String>[];
-        final arr = dia?['batidas'] ?? dia?['marcacoes'] ?? dia?['registros'];
-        if (arr is List) {
-          for (final b in arr) {
-            if (b is! Map) continue;
-            final hora =
-                (b['hora'] ?? b['time'] ?? b['batida'] ?? '').toString();
-            final tipo =
-                (b['tipo'] ?? b['type'] ?? '').toString().toUpperCase();
-            final ident =
-                (b['tipoIdentificador'] ?? b['identificador'] ?? '')
-                    .toString()
-                    .toUpperCase();
-            if (tipo == 'PREVISTA' || ident == 'I') {
-              // Mantém a posição do slot (índice do array) na lista.
-              espelhoSugestoes.add(hora.isEmpty ? '' : formatPunchTime(hora));
-            } else {
-              espelhoSugestoes.add('');
-              if (hora.isNotEmpty) espelhoBatidas.add(formatPunchTime(hora));
-            }
-          }
-        }
+      final esp = await espelhoAtual(enrollment: enrollment, password: password);
+      if (esp != null) {
         return PunchFlowResult.success(PunchResult(
           ok: true,
           day: result.day,
           time: result.time,
           employeeName: result.employeeName,
-          batidasDia: espelhoBatidas.isNotEmpty
-              ? espelhoBatidas
-              : result.batidasDia,
-          jornada: jornada,
-          sugestoes: espelhoSugestoes,
+          batidasDia:
+              esp.batidasDia.isNotEmpty ? esp.batidasDia : result.batidasDia,
+          jornada: esp.jornada,
+          sugestoes: esp.sugestoes,
         ));
-      } catch (_) {
-        // Sem espelho, mantém o resultado do registro.
       }
       return PunchFlowResult.success(result);
     }
     return PunchFlowResult.failure(_mapFailure(result.reason));
   }
+
+  /// Busca o espelho do dia (jornada, previstas e batidas reais), usando o
+  /// login externo com matrícula/senha (salvas ou informadas).
+  Future<PunchResult?> espelhoAtual({String? enrollment, String? password}) async {
+    final matricula = (enrollment ?? savedEnrollment ?? '').trim();
+    final senha = password ?? savedPassword ?? '';
+    if (matricula.isEmpty || senha.isEmpty) return null;
+    try {
+      final company = companyCode;
+      final logged = await _api.ensureExternoLogin(company, matricula, senha);
+      if (!logged) return null;
+      final hoje = DateTime.now();
+      final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
+      // O espelho é por período de apuração: do dia 16 do mês M ao dia 15
+      // do mês M+1, sob a referência "M+1". Ex.: 24/10 -> "2026-11".
+      final refs = hoje.day >= 16 ? [1, 0, 2] : [0, 1, -1];
+      Map<String, dynamic>? espelho;
+      Map? dia;
+      for (final off in refs) {
+        final ref = DateTime(hoje.year, hoje.month + off);
+        final e = await _api.getEspelho(
+          company,
+          '${ref.year}',
+          '${ref.month.toString().padLeft(2, '0')}',
+        );
+        espelho ??= e;
+        final dias = e['dias'];
+        if (dias is Map && dias[hojeKey] is Map) {
+          espelho = e;
+          dia = Map.from(dias[hojeKey] as Map);
+          break;
+        }
+      }
+      ultimoEspelhoJson = jsonEncode(espelho ?? <String, dynamic>{});
+      final jornada =
+          (dia?['jornada'] ?? dia?['jornadaPrevista'] ?? '').toString();
+      // As reais vêm com tipo "ORIGINAL"; as pausas pré-assinaladas pelo
+      // site vêm como "MANUAL" com tipoIdentificador "I"; e as previstas
+      // como "PREVISTA". Mantemos a posição de cada slot.
+      final espelhoBatidas = <String>[];
+      final espelhoSugestoes = <String>[];
+      final arr = dia?['batidas'] ?? dia?['marcacoes'] ?? dia?['registros'];
+      if (arr is List) {
+        for (final b in arr) {
+          if (b is! Map) continue;
+          final hora =
+              (b['hora'] ?? b['time'] ?? b['batida'] ?? '').toString();
+          final tipo =
+              (b['tipo'] ?? b['type'] ?? '').toString().toUpperCase();
+          final ident =
+              (b['tipoIdentificador'] ?? b['identificador'] ?? '')
+                  .toString()
+                  .toUpperCase();
+          if (tipo == 'PREVISTA' || ident == 'I') {
+            espelhoSugestoes.add(hora.isEmpty ? '' : formatPunchTime(hora));
+          } else {
+            espelhoSugestoes.add('');
+            if (hora.isNotEmpty) espelhoBatidas.add(formatPunchTime(hora));
+          }
+        }
+      }
+      return PunchResult(
+        ok: true,
+        day: dia?['referencia']?.toString(),
+        batidasDia: espelhoBatidas,
+        jornada: jornada,
+        sugestoes: espelhoSugestoes,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
 
   String _mapFailure(String? reason) {
     switch (reason) {

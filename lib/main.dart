@@ -227,6 +227,26 @@ class _HomeScreenState extends State<HomeScreen> {
       _repository = PunchRepository(p);
       _todayPunches = _loadTodayPunches(p);
     });
+    _atualizarEspelho();
+  }
+
+  Future<void> _atualizarEspelho() async {
+    final repo = _repository;
+    if (repo == null) return;
+    final esp = await repo.espelhoAtual();
+    if (!mounted || esp == null) return;
+    setState(() {
+      if (esp.batidasDia.isNotEmpty) {
+        _todayPunches = esp.batidasDia.map(formatPunchTime).toList();
+        _persistTodayPunches();
+      }
+      if (esp.jornada != null && esp.jornada!.isNotEmpty) {
+        _jornada = esp.jornada;
+      }
+      if (esp.sugestoes.isNotEmpty) {
+        _sugestoes = esp.sugestoes;
+      }
+    });
   }
 
   @override
@@ -746,7 +766,7 @@ class _TodayPunchesSection extends StatelessWidget {
                 // Logo após o 1º registro, já prevê as pausas (e o fim) com a
                 // jornada prevista do espelho (igual ao site), preenchendo os
                 // círculos em azul. Após registrar, o valor real substitui.
-                final sugVal = apiVal.isNotEmpty ? apiVal : prevVal;
+                final sugVal = apiSug != null ? apiVal : prevVal;
                 final sugOK = sugVal.isNotEmpty;
                 final preenchido = t != null || sugOK;
                 final hora = t != null
