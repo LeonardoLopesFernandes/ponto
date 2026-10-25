@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'api/punch_api.dart';
 import 'main.dart';
 import 'widgets/animated_lock.dart';
+import 'widgets/success_check_animation.dart';
 
 Widget centeredActions(List<Widget> buttons) {
   if (buttons.length == 1) {
@@ -398,11 +399,7 @@ class SuccessPunchDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final time = formatPunchTime(punch.time ?? clockHms(DateTime.now()));
     return AlertDialog(
-      icon: const Icon(
-        Icons.check_circle,
-        color: PontoApp.success,
-        size: 64,
-      ),
+      icon: const SuccessCheckAnimation(),
       title: const Center(child: Text('Ponto registrado!')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
