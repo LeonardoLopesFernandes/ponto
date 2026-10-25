@@ -845,6 +845,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         letterSpacing: 0.5,
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.schedule, size: 22, color: Colors.white),
                   ],
                 ),
               ),
