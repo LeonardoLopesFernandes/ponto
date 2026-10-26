@@ -436,6 +436,8 @@ class PunchRepository {
     identity = null;
     publicKey = null;
     clearPassword();
+    saveEspelhoJwt(null, null);
+    _api.restoreExternoJwt(null, null);
     _api.clearSession();
   }
 
@@ -526,7 +528,9 @@ class PunchRepository {
     String? enrollment,
     String? password,
     bool? persist,
+    DateTime? dia,
   }) async {
+    final alvo = dia ?? DateTime.now();
     final matricula = (enrollment ?? savedEnrollment ?? '').trim();
     final senha = password ?? savedPassword ?? '';
     final company = companyCode;
@@ -539,7 +543,7 @@ class PunchRepository {
             exp.isAfter(DateTime.now().add(const Duration(minutes: 5))));
     if (jwtValido) {
       _api.restoreExternoJwt(jwt, exp);
-      final r = await _buscarEspelho(company);
+      final r = await _buscarEspelho(company, alvo);
       if (r != null) return r;
       // JWT pode ter sido revogado; tenta logar de novo se tiver senha.
       _api.restoreExternoJwt(null, null);
@@ -551,7 +555,7 @@ class PunchRepository {
         memJwt.isNotEmpty &&
         (memExp == null ||
             memExp.isAfter(DateTime.now().add(const Duration(minutes: 5))))) {
-      final r = await _buscarEspelho(company);
+      final r = await _buscarEspelho(company, alvo);
       if (r != null) return r;
     }
     if (matricula.isEmpty || senha.isEmpty) return null;
@@ -560,20 +564,19 @@ class PunchRepository {
     if (persist ?? rememberLogin) {
       saveEspelhoJwt(_api.externoJwt, _api.externoExp);
     }
-    return _buscarEspelho(company);
+    return _buscarEspelho(company, alvo);
   }
 
-  Future<PunchResult?> _buscarEspelho(String company) async {
+  Future<PunchResult?> _buscarEspelho(String company, DateTime alvo) async {
     try {
-      final hoje = DateTime.now();
-      final hojeKey = DateFormat('yyyy-MM-dd').format(hoje);
+      final chave = DateFormat('yyyy-MM-dd').format(alvo);
       // O espelho é por período de apuração: do dia 16 do mês M ao dia 15
       // do mês M+1, sob a referência "M+1". Ex.: 24/10 -> "2026-11".
-      final refs = hoje.day >= 16 ? [1, 0, 2] : [0, 1, -1];
+      final refs = alvo.day >= 16 ? [1, 0, 2] : [0, 1, -1];
       Map<String, dynamic>? espelho;
       Map? dia;
       for (final off in refs) {
-        final ref = DateTime(hoje.year, hoje.month + off);
+        final ref = DateTime(alvo.year, alvo.month + off);
         final e = await _api.getEspelho(
           company,
           '${ref.year}',
@@ -581,9 +584,9 @@ class PunchRepository {
         );
         espelho ??= e;
         final dias = e['dias'];
-        if (dias is Map && dias[hojeKey] is Map) {
+        if (dias is Map && dias[chave] is Map) {
           espelho = e;
-          dia = Map.from(dias[hojeKey] as Map);
+          dia = Map.from(dias[chave] as Map);
           break;
         }
       }
@@ -669,22 +672,38 @@ class PunchFlowResult {
       PunchFlowResult._(false, null, error);
 }
 
-String formatDatePt(DateTime d) {
-  final weekdays = {
-    DateTime.monday: 'Segunda-feira',
-    DateTime.tuesday: 'Terça-feira',
-    DateTime.wednesday: 'Quarta-feira',
-    DateTime.thursday: 'Quinta-feira',
-    DateTime.friday: 'Sexta-feira',
-    DateTime.saturday: 'Sábado',
-    DateTime.sunday: 'Domingo',
-  };
-  final months = {
-    1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril', 5: 'maio', 6: 'junho',
-    7: 'julho', 8: 'agosto', 9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro',
-  };
-  return '${weekdays[d.weekday]}, ${d.day} de ${months[d.month]} de ${d.year}';
-}
+const _weekdaysPt = {
+  DateTime.monday: 'Segunda-feira',
+  DateTime.tuesday: 'Terça-feira',
+  DateTime.wednesday: 'Quarta-feira',
+  DateTime.thursday: 'Quinta-feira',
+  DateTime.friday: 'Sexta-feira',
+  DateTime.saturday: 'Sábado',
+  DateTime.sunday: 'Domingo',
+};
+
+const _monthsPt = {
+  1: 'janeiro',
+  2: 'fevereiro',
+  3: 'março',
+  4: 'abril',
+  5: 'maio',
+  6: 'junho',
+  7: 'julho',
+  8: 'agosto',
+  9: 'setembro',
+  10: 'outubro',
+  11: 'novembro',
+  12: 'dezembro',
+};
+
+String formatWeekdayPt(DateTime d) => _weekdaysPt[d.weekday] ?? '';
+
+String formatMonthYearPt(DateTime d) =>
+    '${_monthsPt[d.month] ?? ''} de ${d.year}';
+
+String formatDatePt(DateTime d) =>
+    '${formatWeekdayPt(d)}, ${d.day} de ${_monthsPt[d.month] ?? ''} de ${d.year}';
 
 String clockHm(DateTime t) => DateFormat('HH:mm').format(t);
 String clockHms(DateTime t) => DateFormat('HH:mm:ss').format(t);

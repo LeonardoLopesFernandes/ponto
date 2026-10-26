@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/punch_api.dart';
@@ -112,6 +113,13 @@ class PontoApp extends StatelessWidget {
       title: AppConfig.appTitle,
       debugShowCheckedModeBanner: false,
       theme: theme,
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: const SplashScreen(),
     );
   }
@@ -597,11 +605,18 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _jornada;
   List<String> _sugestoes = [];
   late DateTime _now;
+  late DateTime _selectedDate;
+  PunchResult? _historico;
+  bool _historicoLoading = false;
+  String? _historicoErro;
+  int _historicoRequest = 0;
   Timer? _clockTimer;
 
   @override
   void initState() {
-    _now = widget.initialNow ?? DateTime.now();
+    final agora = widget.initialNow ?? DateTime.now();
+    _now = agora;
+    _selectedDate = DateTime(agora.year, agora.month, agora.day);
     super.initState();
     _init();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -695,6 +710,70 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  bool get _isHoje => _sameDay(_selectedDate, DateTime.now());
+
+  Future<void> _pickDate() async {
+    final hoje = DateTime.now();
+    final primeiro = DateTime(hoje.year - 1, 1, 1);
+    final ultimo = DateTime(hoje.year, hoje.month, hoje.day);
+    var inicial = _selectedDate;
+    if (inicial.isBefore(primeiro)) inicial = primeiro;
+    if (inicial.isAfter(ultimo)) inicial = ultimo;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: inicial,
+      firstDate: primeiro,
+      lastDate: ultimo,
+      helpText: 'Escolha o dia',
+      cancelText: 'Cancelar',
+      confirmText: 'Ver dia',
+      fieldLabelText: 'Dia',
+      fieldHintText: 'dd/mm/aaaa',
+    );
+    if (picked == null || !mounted) return;
+    final dia = DateTime(picked.year, picked.month, picked.day);
+    if (_sameDay(dia, DateTime.now())) {
+      _voltarParaHoje();
+    } else {
+      _carregarDia(dia);
+    }
+  }
+
+  Future<void> _carregarDia(DateTime dia) async {
+    final repo = _repository;
+    if (repo == null) return;
+    final token = ++_historicoRequest;
+    setState(() {
+      _selectedDate = dia;
+      _historico = null;
+      _historicoErro = null;
+      _historicoLoading = true;
+    });
+    final esp = await repo.espelhoAtual(dia: dia);
+    if (!mounted || token != _historicoRequest) return;
+    setState(() {
+      _historico = esp;
+      _historicoLoading = false;
+      _historicoErro =
+          esp == null ? 'Não foi possível carregar este dia.' : null;
+    });
+  }
+
+  void _voltarParaHoje() {
+    _historicoRequest++;
+    final agora = DateTime.now();
+    setState(() {
+      _selectedDate = DateTime(agora.year, agora.month, agora.day);
+      _historico = null;
+      _historicoErro = null;
+      _historicoLoading = false;
+    });
+    _atualizarEspelho();
+  }
+
   Future<void> _openPunchDialog() async {
     final repository = _repository;
     if (repository == null) return;
@@ -770,9 +849,19 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => SettingsDialog(
         currentCode: repository.companyCode,
         onSave: (code) {
+          repository.setCompanyCode(code);
+          _historicoRequest++;
+          final agora = DateTime.now();
           setState(() {
-            repository.setCompanyCode(code);
+            _selectedDate = DateTime(agora.year, agora.month, agora.day);
+            _historico = null;
+            _historicoErro = null;
+            _historicoLoading = false;
+            _todayPunches = [];
+            _jornada = null;
+            _sugestoes = [];
           });
+          _atualizarEspelho();
         },
       ),
     );
@@ -796,10 +885,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+    final hoje = _isHoje;
+    final punches =
+        hoje ? _todayPunches : (_historico?.batidasDia ?? const <String>[]);
+    final jornada = hoje ? _jornada : _historico?.jornada;
+    final sugestoes =
+        hoje ? _sugestoes : (_historico?.sugestoes ?? const <String>[]);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        if (!_isHoje) {
+          _voltarParaHoje();
+          return;
+        }
         showDialog(
           context: context,
           builder: (_) => const _ExitDialog(),
@@ -815,6 +914,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           actions: [
             IconButton(
+              icon: const Icon(Icons.calendar_month_outlined),
+              tooltip: 'Escolher dia',
+              onPressed: _pickDate,
+            ),
+            IconButton(
               icon: const Icon(Icons.settings_outlined),
               tooltip: 'Configurações',
               onPressed: _showSettings,
@@ -825,37 +929,55 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             children: [
-              _ClockCard(now: _now),
-              const SizedBox(height: 24),
-              _GradientButton(
-                onPressed: _openPunchDialog,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.schedule, size: 22, color: Colors.white),
-                    const SizedBox(width: 12),
-                    TypewriterText(
-                      text: 'REGISTRE SEU PONTO',
-                      onceKey: 'badge_registrar',
-                      startDelay: const Duration(milliseconds: 300),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.schedule, size: 22, color: Colors.white),
-                  ],
+              if (hoje)
+                _ClockCard(now: _now)
+              else
+                _SelectedDateCard(
+                  date: _selectedDate,
+                  onToday: _voltarParaHoje,
                 ),
-              ),
+              if (hoje) ...[
+                const SizedBox(height: 24),
+                _GradientButton(
+                  onPressed: _openPunchDialog,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.schedule, size: 22, color: Colors.white),
+                      const SizedBox(width: 12),
+                      TypewriterText(
+                        text: 'REGISTRE SEU PONTO',
+                        onceKey: 'badge_registrar',
+                        startDelay: const Duration(milliseconds: 300),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.schedule, size: 22, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
-              _TodayPunchesSection(
-                punches: _todayPunches,
-                jornada: _jornada,
-                sugestoes: _sugestoes,
-              ),
+              if (!hoje && _historicoLoading)
+                const _DiaLoadingCard()
+              else if (!hoje && _historicoErro != null)
+                _DiaErroCard(
+                  mensagem: _historicoErro!,
+                  onTentarNovamente: () => _carregarDia(_selectedDate),
+                )
+              else
+                _PunchesSection(
+                  punches: punches,
+                  jornada: jornada,
+                  sugestoes: sugestoes,
+                  titulo: hoje ? 'Registros de hoje' : 'Registros do dia',
+                  mostrarPrevistas: !hoje,
+                ),
             ],
           ),
         ),
@@ -943,6 +1065,149 @@ class _ClockCard extends StatelessWidget {
   }
 }
 
+class _SelectedDateCard extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onToday;
+  const _SelectedDateCard({required this.date, required this.onToday});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      decoration: BoxDecoration(
+        gradient: PontoApp.brandGradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x280108B2),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            formatWeekdayPt(date),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${date.day}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 62,
+              fontWeight: FontWeight.w700,
+              height: 1,
+              letterSpacing: -1,
+            ),
+          ),
+          Text(
+            formatMonthYearPt(date),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onToday,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: const Color(0x22FFFFFF),
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Voltar para hoje',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiaLoadingCard extends StatelessWidget {
+  const _DiaLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E9FF)),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 12),
+          Text(
+            'Carregando o dia...',
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiaErroCard extends StatelessWidget {
+  final String mensagem;
+  final VoidCallback onTentarNovamente;
+  const _DiaErroCard({
+    required this.mensagem,
+    required this.onTentarNovamente,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E9FF)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off_outlined, color: PontoApp.error, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            mensagem,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onTentarNovamente,
+            style: TextButton.styleFrom(foregroundColor: PontoApp.brand),
+            child: const Text('Tentar novamente'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GradientButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final Widget child;
@@ -975,17 +1240,21 @@ class _GradientButton extends StatelessWidget {
   }
 }
 
-class _TodayPunchesSection extends StatelessWidget {
+class _PunchesSection extends StatelessWidget {
   final List<String> punches;
   final String? jornada;
+  final String titulo;
+  final bool mostrarPrevistas;
 
   /// Sugestões vindas do espelho (batidas com tipo "PREVISTA"), por slot.
   final List<String> sugestoes;
 
-  const _TodayPunchesSection({
+  const _PunchesSection({
     required this.punches,
     this.jornada,
     this.sugestoes = const [],
+    this.titulo = 'Registros de hoje',
+    this.mostrarPrevistas = false,
   });
 
   static const _labels = [
@@ -1013,13 +1282,12 @@ class _TodayPunchesSection extends StatelessWidget {
   List<String>? _jornadaSlots() {
     final j = jornada?.trim() ?? '';
     if (j.isEmpty) return null;
-    final p = j
-        .split('|')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
+    final horarios = RegExp(r'([01]?\d|2[0-3]):[0-5]\d')
+        .allMatches(j)
+        .map((m) => _norm(m.group(0)!))
         .toList();
-    if (p.length < 4) return null;
-    return p.take(4).map(_norm).toList();
+    if (horarios.length < 4) return null;
+    return horarios.take(4).toList();
   }
 
   static int _toMin(String t) {
@@ -1027,6 +1295,27 @@ class _TodayPunchesSection extends StatelessWidget {
     final h = int.tryParse(p[0]) ?? 0;
     final m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
     return h * 60 + m;
+  }
+
+  static List<String?>? _slotsPorVazios(
+      List<String> punches, List<String>? sug) {
+    if (sug == null || sug.length < 4) return null;
+    final vistos = <String>{};
+    final unicos = <String>[];
+    for (final p in punches) {
+      final h = p.length > 5 ? p.substring(0, 5) : p;
+      if (vistos.add(h)) unicos.add(h);
+    }
+    final vazios = <int>[];
+    for (var i = 0; i < 4; i++) {
+      if (sug[i].isEmpty) vazios.add(i);
+    }
+    if (vazios.isEmpty || vazios.length != unicos.length) return null;
+    final slots = List<String?>.filled(4, null);
+    for (var i = 0; i < unicos.length; i++) {
+      slots[vazios[i]] = unicos[i];
+    }
+    return slots;
   }
 
   /// Encaixa cada batida no slot (0..3) mais próximo da sugestão.
@@ -1085,19 +1374,20 @@ class _TodayPunchesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final apiSug = _sugestoesApi();
     final previstas = _jornadaPrevista();
-    final slots = _slotsAlinhados(punches, previstas ?? apiSug);
+    final slots = _slotsPorVazios(punches, sugestoes) ??
+        _slotsAlinhados(punches, previstas ?? apiSug);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Registros de hoje',
-          style: TextStyle(
+        Text(
+          titulo,
+          style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Color(0xFF1A202C)),
         ),
         const SizedBox(height: 12),
-        if (punches.isEmpty)
+        if (punches.isEmpty && !mostrarPrevistas)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -1149,7 +1439,7 @@ class _TodayPunchesSection extends StatelessWidget {
                 // Antes da batida final mostra só o que o site manda (pausas
                 // em branco); depois da final preenche as pausas com a
                 // jornada, caso o site ainda não tenha assinalado.
-                final finalOk = punches.length >= 2;
+                final finalOk = punches.length >= 2 || mostrarPrevistas;
                 final sugVal = apiVal.isNotEmpty
                     ? apiVal
                     : (apiSug == null || finalOk ? prevVal : '');
