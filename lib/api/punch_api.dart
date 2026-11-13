@@ -30,6 +30,7 @@ class PunchResult {
   final String? employeeName;
   final List<String> batidasDia;
   final String? jornada;
+  final String? saldoBancoHoras;
 
   /// Sugestões de batida do espelho (entradas com tipo "PREVISTA"),
   /// alinhadas por posição de slot (0=início, 1=início pausa, 2=fim pausa,
@@ -44,6 +45,7 @@ class PunchResult {
     this.employeeName,
     this.batidasDia = const [],
     this.jornada,
+    this.saldoBancoHoras,
     this.sugestoes = const [],
   });
 }
@@ -623,11 +625,87 @@ class PunchRepository {
         day: dia?['referencia']?.toString(),
         batidasDia: espelhoBatidas,
         jornada: jornada,
+        saldoBancoHoras: _extrairSaldoBanco(espelho),
         sugestoes: espelhoSugestoes,
       );
     } catch (_) {
       return null;
     }
+  }
+
+  String? _extrairSaldoBanco(Map<String, dynamic>? espelho) {
+    if (espelho == null) return null;
+    final meses = espelho['meses'];
+    if (meses is! Map) return null;
+    final ref = (espelho['referencia'] ?? '').toString();
+    Map? mes;
+    if (ref.isNotEmpty) mes = meses[ref] as Map?;
+    if (mes == null) {
+      for (final v in meses.values) {
+        if (v is Map && v['referencia']?.toString() == ref) {
+          mes = v;
+          break;
+        }
+      }
+    }
+    if (mes == null) {
+      for (final v in meses.values) {
+        if (v is Map && (v['totais'] as List?)?.isNotEmpty == true) {
+          mes = v;
+          break;
+        }
+      }
+    }
+    final totais = (mes?['totais'] as List?) ?? const [];
+    return _saldoDosTotais(totais);
+  }
+
+  String? _saldoDosTotais(List totais) {
+    final valores = <String, String>{};
+    for (final t in totais.whereType<Map>()) {
+      final desc = (t['descricao'] ?? '').toString().trim().toUpperCase();
+      final valor = (t['valor'] ?? '').toString().trim();
+      if (desc.isEmpty || valor.isEmpty) continue;
+      // Ex.: "Horas Extras Banco 60% (quitação automática)" já é o saldo final.
+      if (desc.contains('HORAS EXTRAS BANCO')) return valor;
+      valores[desc] = valor;
+    }
+    String? acumulado;
+    String? noMes;
+    for (final e in valores.entries) {
+      if (e.key.contains('BANCO DE HORAS ACUMULADO')) acumulado = e.value;
+      if (e.key.contains('BANCO DE HORAS NO M')) noMes = e.value;
+    }
+    if (acumulado != null && noMes != null) {
+      return _fmtDuracao(_parseDuracao(acumulado) + _parseDuracao(noMes));
+    }
+    for (final e in valores.entries) {
+      if (e.key == 'BANCO DE HORAS') return e.value;
+    }
+    for (final e in valores.entries) {
+      if (e.key.contains('SALDO') && e.key.contains('BANCO')) return e.value;
+    }
+    return null;
+  }
+
+  Duration _parseDuracao(String valor) {
+    var v = valor.trim();
+    final negativo = v.startsWith('-');
+    v = v.replaceAll('-', '');
+    final partes = v.split(':');
+    final horas = int.tryParse(partes.isNotEmpty ? partes[0] : '') ?? 0;
+    final minutos =
+        int.tryParse(partes.length > 1 ? partes[1] : '') ?? 0;
+    final d = Duration(hours: horas, minutes: minutos);
+    return negativo ? -d : d;
+  }
+
+  String _fmtDuracao(Duration d) {
+    final neg = d.isNegative;
+    final abs = d.abs();
+    final h = abs.inHours.toString().padLeft(2, '0');
+    final m = (abs.inMinutes % 60).toString().padLeft(2, '0');
+    return '${neg ? '-' : ''}$h:$m';
   }
 
   String _mapFailure(String? reason) {

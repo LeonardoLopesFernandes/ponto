@@ -603,6 +603,7 @@ class _HomeScreenState extends State<HomeScreen> {
   PunchRepository? _repository;
   List<String> _todayPunches = [];
   String? _jornada;
+  String? _saldoBancoHoras;
   List<String> _sugestoes = [];
   late DateTime _now;
   late DateTime _selectedDate;
@@ -676,6 +677,10 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       if (esp.sugestoes.isNotEmpty) {
         _sugestoes = esp.sugestoes;
+      }
+      if (esp.saldoBancoHoras != null &&
+          esp.saldoBancoHoras!.isNotEmpty) {
+        _saldoBancoHoras = esp.saldoBancoHoras;
       }
     });
     _persistEspelho(esp);
@@ -759,7 +764,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _historicoLoading = false;
       _historicoErro =
           esp == null ? 'Não foi possível carregar este dia.' : null;
+      if (esp?.saldoBancoHoras != null &&
+          esp!.saldoBancoHoras!.isNotEmpty) {
+        _saldoBancoHoras = esp.saldoBancoHoras;
+      }
     });
+  }
+
+  void _diaAnterior() {
+    _carregarDia(_selectedDate.subtract(const Duration(days: 1)));
+  }
+
+  void _diaSeguinte() {
+    final agora = DateTime.now();
+    final hoje = DateTime(agora.year, agora.month, agora.day);
+    final proximo = _selectedDate.add(const Duration(days: 1));
+    if (proximo.isAfter(hoje)) return;
+    if (_sameDay(proximo, hoje)) {
+      _voltarParaHoje();
+    } else {
+      _carregarDia(proximo);
+    }
   }
 
   void _voltarParaHoje() {
@@ -859,6 +884,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _historicoLoading = false;
             _todayPunches = [];
             _jornada = null;
+            _saldoBancoHoras = null;
             _sugestoes = [];
           });
           _atualizarEspelho();
@@ -934,6 +960,10 @@ class _HomeScreenState extends State<HomeScreen> {
               else
                 _SelectedDateCard(
                   date: _selectedDate,
+                  onPrevious: _diaAnterior,
+                  onNext: _diaSeguinte,
+                  canNext: _selectedDate.isBefore(
+                      DateTime(_now.year, _now.month, _now.day)),
                   onToday: _voltarParaHoje,
                 ),
               if (hoje) ...[
@@ -980,6 +1010,46 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
+        ),
+        bottomNavigationBar: _SaldoBancoBar(saldo: _saldoBancoHoras),
+      ),
+    );
+  }
+}
+
+class _SaldoBancoBar extends StatelessWidget {
+  final String? saldo;
+  const _SaldoBancoBar({this.saldo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF5CB85C),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'SALDO DE BANCO DE HORAS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            Text(
+              (saldo == null || saldo!.isEmpty) ? '--:--' : saldo!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1067,14 +1137,24 @@ class _ClockCard extends StatelessWidget {
 
 class _SelectedDateCard extends StatelessWidget {
   final DateTime date;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final bool canNext;
   final VoidCallback onToday;
-  const _SelectedDateCard({required this.date, required this.onToday});
+
+  const _SelectedDateCard({
+    required this.date,
+    required this.onPrevious,
+    required this.onNext,
+    required this.canNext,
+    required this.onToday,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
       decoration: BoxDecoration(
         gradient: PontoApp.brandGradient,
         borderRadius: BorderRadius.circular(20),
@@ -1089,7 +1169,7 @@ class _SelectedDateCard extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            formatWeekdayPt(date),
+            formatMonthYearPt(date),
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 14,
@@ -1097,24 +1177,56 @@ class _SelectedDateCard extends StatelessWidget {
               letterSpacing: 0.4,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            '${date.day}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 62,
-              fontWeight: FontWeight.w700,
-              height: 1,
-              letterSpacing: -1,
-            ),
-          ),
-          Text(
-            formatMonthYearPt(date),
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: onPrevious,
+                icon: const Icon(Icons.chevron_left,
+                    color: Colors.white, size: 34),
+                tooltip: 'Dia anterior',
+              ),
+              Container(
+                width: 132,
+                height: 132,
+                decoration: const BoxDecoration(
+                  color: Color(0x33FFFFFF),
+                  shape: BoxShape.circle,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      formatWeekdayPt(date),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${date.day}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 54,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: canNext ? onNext : null,
+                icon: Icon(
+                  Icons.chevron_right,
+                  color: canNext ? Colors.white : Colors.white30,
+                  size: 34,
+                ),
+                tooltip: 'Próximo dia',
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           TextButton(
