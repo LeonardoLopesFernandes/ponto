@@ -764,7 +764,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _historicoLoading = false;
       _historicoErro =
           esp == null ? 'Não foi possível carregar este dia.' : null;
-      if (esp?.saldoBancoHoras != null &&
+      // Mantém o saldo atual do site mesmo ao navegar por dias anteriores.
+      if ((_saldoBancoHoras == null || _saldoBancoHoras!.isEmpty) &&
+          esp?.saldoBancoHoras != null &&
           esp!.saldoBancoHoras!.isNotEmpty) {
         _saldoBancoHoras = esp.saldoBancoHoras;
       }

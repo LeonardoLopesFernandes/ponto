@@ -662,12 +662,14 @@ class PunchRepository {
 
   String? _saldoDosTotais(List totais) {
     final valores = <String, String>{};
+    String? horasExtras;
     for (final t in totais.whereType<Map>()) {
       final desc = (t['descricao'] ?? '').toString().trim().toUpperCase();
       final valor = (t['valor'] ?? '').toString().trim();
       if (desc.isEmpty || valor.isEmpty) continue;
-      // Ex.: "Horas Extras Banco 60% (quitação automática)" já é o saldo final.
-      if (desc.contains('HORAS EXTRAS BANCO')) return valor;
+      if (desc.contains('HORAS EXTRAS BANCO')) {
+        horasExtras = valor;
+      }
       valores[desc] = valor;
     }
     String? acumulado;
@@ -676,9 +678,11 @@ class PunchRepository {
       if (e.key.contains('BANCO DE HORAS ACUMULADO')) acumulado = e.value;
       if (e.key.contains('BANCO DE HORAS NO M')) noMes = e.value;
     }
+    // O site mostra o saldo acumulado + o banco do mês.
     if (acumulado != null && noMes != null) {
       return _fmtDuracao(_parseDuracao(acumulado) + _parseDuracao(noMes));
     }
+    if (horasExtras != null) return horasExtras;
     for (final e in valores.entries) {
       if (e.key == 'BANCO DE HORAS') return e.value;
     }
