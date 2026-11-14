@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -248,6 +249,84 @@ class AhgoraApi {
     }
   }
 
+  Map<String, String> _jsonHeaders() => {
+        HttpHeaders.acceptHeader: 'application/json, text/plain, */*',
+        HttpHeaders.contentTypeHeader: 'application/json',
+        'origin': 'https://mirror.app.ahgora.com.br',
+        'referer': 'https://mirror.app.ahgora.com.br/',
+      };
+
+  Future<Map<String, dynamic>> criarJustificativa(
+      Map<String, dynamic> payload) async {
+    final raw = await _externoRequest(
+      'POST',
+      '$baseUrl/api-espelho/justificativas',
+      headers: _jsonHeaders(),
+      body: jsonEncode(payload),
+    );
+    return _json(raw);
+  }
+
+  Future<void> anexarComprovante(
+    String justificativaId,
+    String filename,
+    List<int> bytes,
+  ) async {
+    final credRaw = await _externoRequest(
+      'POST',
+      '$baseUrl/attachs/getCredentials',
+      headers: _jsonHeaders(),
+      body: jsonEncode({
+        'filename': filename,
+        'path': '/justificativas/$justificativaId/arquivos/',
+      }),
+    );
+    final cred = _json(credRaw);
+    final url = cred['url']?.toString() ?? '';
+    final credentials = cred['credentials'];
+    if (url.isEmpty || credentials is! Map) {
+      throw AhgoraApiException('Não foi possível preparar o comprovante.');
+    }
+
+    final upload = http.MultipartRequest('POST', Uri.parse(url));
+    final creds = Map<String, dynamic>.from(credentials);
+    if (cred['type']?.toString() == 's3') {
+      upload.fields['key'] = creds['s3path']?.toString() ?? '';
+      upload.fields['AWSAccessKeyId'] =
+          creds['s3accesskey']?.toString() ?? '';
+      upload.fields['acl'] = creds['s3acl']?.toString() ?? '';
+      upload.fields['policy'] = creds['s3policy']?.toString() ?? '';
+      upload.fields['signature'] = creds['s3signature']?.toString() ?? '';
+      upload.fields['success_action_status'] = '201';
+    } else {
+      for (final entry in creds.entries) {
+        upload.fields[entry.key.toString()] = entry.value.toString();
+      }
+    }
+    upload.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: filename),
+    );
+    final response = await upload.send();
+    await response.stream.bytesToString();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AhgoraApiException(
+        'Falha ao enviar o comprovante (${response.statusCode}).',
+      );
+    }
+
+    await _externoRequest(
+      'POST',
+      '$baseUrl/attachs/save',
+      headers: _jsonHeaders(),
+      body: jsonEncode({
+        'filename': filename,
+        'bucket': cred['bucket']?.toString() ?? '',
+        'path': cred['path']?.toString() ?? '',
+        'remote_filename': cred['remote_filename']?.toString() ?? '',
+      }),
+    );
+  }
+
   DateTime? _jwtExp(String jwt) {
     try {
       final parts = jwt.split('.');
@@ -441,6 +520,48 @@ class PunchRepository {
     saveEspelhoJwt(null, null);
     _api.restoreExternoJwt(null, null);
     _api.clearSession();
+  }
+
+  Future<bool> garantirLoginExterno() {
+    final matricula = savedEnrollment ?? '';
+    final senha = savedPassword ?? '';
+    if (matricula.isEmpty || senha.isEmpty) return Future.value(false);
+    return _api.ensureExternoLogin(companyCode, matricula, senha);
+  }
+
+  Future<void> incluirBatida({
+    required DateTime referencia,
+    required String hora,
+    required String mensagem,
+    String? nomeArquivo,
+    List<int>? bytesArquivo,
+  }) async {
+    if (!await garantirLoginExterno()) {
+      throw AhgoraApiException(
+        'Faça login em Registrar Ponto e marque a opção de lembrar os dados '
+        'para enviar a solicitação.',
+      );
+    }
+    final ref = DateFormat('yyyy-MM-dd').format(referencia);
+    final created = await _api.criarJustificativa({
+      'referencia': ref,
+      'referencia_final': ref,
+      'tipo': 'addPunch',
+      'justificativa': 'outros',
+      'mensagem': mensagem.trim(),
+      'arquivos': <dynamic>[],
+      'addPunch': {
+        'hora': hora,
+        'referencia': ref,
+      },
+    });
+    final id = created['id']?.toString() ?? '';
+    if (id.isNotEmpty &&
+        nomeArquivo != null &&
+        nomeArquivo.isNotEmpty &&
+        bytesArquivo != null) {
+      await _api.anexarComprovante(id, nomeArquivo, bytesArquivo);
+    }
   }
 
   Future<PunchFlowResult> registerPunch(String enrollment, String password) async {

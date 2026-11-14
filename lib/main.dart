@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/punch_api.dart';
+import 'incluir_batida_screen.dart';
 import 'punch_dialog.dart';
 import 'package:lottie/lottie.dart';
 import 'widgets/ponto_logo_animado.dart';
@@ -800,6 +801,29 @@ class _HomeScreenState extends State<HomeScreen> {
     _atualizarEspelho();
   }
 
+  Future<void> _abrirIncluirBatida() async {
+    final repo = _repository;
+    if (repo == null) return;
+    final enviado = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => IncluirBatidaScreen(
+          repository: repo,
+          referencia: _selectedDate,
+        ),
+      ),
+    );
+    if (enviado == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Solicitação de inclusão enviada.')),
+      );
+      if (_isHoje) {
+        await _atualizarEspelho();
+      } else {
+        await _carregarDia(_selectedDate);
+      }
+    }
+  }
+
   Future<void> _openPunchDialog() async {
     final repository = _repository;
     if (repository == null) return;
@@ -993,6 +1017,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _abrirIncluirBatida,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: PontoApp.brand,
+                  side: const BorderSide(color: PontoApp.brand, width: 1.5),
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.add_alarm, size: 21),
+                label: const Text(
+                  'INCLUIR BATIDA',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
               const SizedBox(height: 32),
               if (!hoje && _historicoLoading)
                 const _DiaLoadingCard()
