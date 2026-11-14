@@ -678,10 +678,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (esp.sugestoes.isNotEmpty) {
         _sugestoes = esp.sugestoes;
       }
-      if (esp.saldoBancoHoras != null &&
-          esp.saldoBancoHoras!.isNotEmpty) {
-        _saldoBancoHoras = esp.saldoBancoHoras;
-      }
+      _saldoBancoHoras = esp.saldoBancoHoras != null &&
+              esp.saldoBancoHoras!.isNotEmpty
+          ? esp.saldoBancoHoras
+          : null;
     });
     _persistEspelho(esp);
   }
@@ -764,12 +764,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _historicoLoading = false;
       _historicoErro =
           esp == null ? 'Não foi possível carregar este dia.' : null;
-      // Mantém o saldo atual do site mesmo ao navegar por dias anteriores.
-      if ((_saldoBancoHoras == null || _saldoBancoHoras!.isEmpty) &&
-          esp?.saldoBancoHoras != null &&
-          esp!.saldoBancoHoras!.isNotEmpty) {
-        _saldoBancoHoras = esp.saldoBancoHoras;
-      }
+      // Atualiza o saldo do mês correspondente ao dia selecionado.
+      _saldoBancoHoras = esp?.saldoBancoHoras != null &&
+              esp!.saldoBancoHoras!.isNotEmpty
+          ? esp.saldoBancoHoras
+          : null;
     });
   }
 
@@ -1034,7 +1033,7 @@ class _SaldoBancoBar extends StatelessWidget {
           children: [
             const Expanded(
               child: Text(
-                'SALDO DE BANCO DE HORAS',
+                'SALDO DO MÊS',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 15,

@@ -577,8 +577,11 @@ class PunchRepository {
       final refs = alvo.day >= 16 ? [1, 0, 2] : [0, 1, -1];
       Map<String, dynamic>? espelho;
       Map? dia;
+      String? mesRef;
       for (final off in refs) {
         final ref = DateTime(alvo.year, alvo.month + off);
+        final refKey =
+            '${ref.year}-${ref.month.toString().padLeft(2, '0')}';
         final e = await _api.getEspelho(
           company,
           '${ref.year}',
@@ -588,6 +591,7 @@ class PunchRepository {
         final dias = e['dias'];
         if (dias is Map && dias[chave] is Map) {
           espelho = e;
+          mesRef = refKey;
           dia = Map.from(dias[chave] as Map);
           break;
         }
@@ -625,7 +629,7 @@ class PunchRepository {
         day: dia?['referencia']?.toString(),
         batidasDia: espelhoBatidas,
         jornada: jornada,
-        saldoBancoHoras: _extrairSaldoBanco(espelho),
+        saldoBancoHoras: _extrairSaldoBanco(espelho, mesRef),
         sugestoes: espelhoSugestoes,
       );
     } catch (_) {
@@ -633,11 +637,14 @@ class PunchRepository {
     }
   }
 
-  String? _extrairSaldoBanco(Map<String, dynamic>? espelho) {
+  String? _extrairSaldoBanco(
+    Map<String, dynamic>? espelho, [
+    String? mesRef,
+  ]) {
     if (espelho == null) return null;
     final meses = espelho['meses'];
     if (meses is! Map) return null;
-    final ref = (espelho['referencia'] ?? '').toString();
+    final ref = (mesRef ?? espelho['referencia'] ?? '').toString();
     Map? mes;
     if (ref.isNotEmpty) mes = meses[ref] as Map?;
     if (mes == null) {
@@ -678,11 +685,11 @@ class PunchRepository {
       if (e.key.contains('BANCO DE HORAS ACUMULADO')) acumulado = e.value;
       if (e.key.contains('BANCO DE HORAS NO M')) noMes = e.value;
     }
-    // O site mostra o saldo acumulado + o banco do mês.
-    if (acumulado != null && noMes != null) {
-      return _fmtDuracao(_parseDuracao(acumulado) + _parseDuracao(noMes));
-    }
+    // O valor exibido é o saldo do mês selecionado, não o acumulado
+    // de todos os meses.
+    if (noMes != null) return noMes;
     if (horasExtras != null) return horasExtras;
+    if (acumulado != null) return acumulado;
     for (final e in valores.entries) {
       if (e.key == 'BANCO DE HORAS') return e.value;
     }
@@ -690,26 +697,6 @@ class PunchRepository {
       if (e.key.contains('SALDO') && e.key.contains('BANCO')) return e.value;
     }
     return null;
-  }
-
-  Duration _parseDuracao(String valor) {
-    var v = valor.trim();
-    final negativo = v.startsWith('-');
-    v = v.replaceAll('-', '');
-    final partes = v.split(':');
-    final horas = int.tryParse(partes.isNotEmpty ? partes[0] : '') ?? 0;
-    final minutos =
-        int.tryParse(partes.length > 1 ? partes[1] : '') ?? 0;
-    final d = Duration(hours: horas, minutes: minutos);
-    return negativo ? -d : d;
-  }
-
-  String _fmtDuracao(Duration d) {
-    final neg = d.isNegative;
-    final abs = d.abs();
-    final h = abs.inHours.toString().padLeft(2, '0');
-    final m = (abs.inMinutes % 60).toString().padLeft(2, '0');
-    return '${neg ? '-' : ''}$h:$m';
   }
 
   String _mapFailure(String? reason) {
