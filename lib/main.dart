@@ -1050,6 +1050,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   punches: punches,
                   jornada: jornada,
                   sugestoes: sugestoes,
+                  data: hoje ? DateTime.now() : _selectedDate,
                   titulo: hoje ? 'Registros de hoje' : 'Registros do dia',
                   mostrarPrevistas: !hoje,
                 ),
@@ -1402,6 +1403,7 @@ class _PunchesSection extends StatelessWidget {
   final String? jornada;
   final String titulo;
   final bool mostrarPrevistas;
+  final DateTime? data;
 
   /// Sugestões vindas do espelho (batidas com tipo "PREVISTA"), por slot.
   final List<String> sugestoes;
@@ -1412,6 +1414,7 @@ class _PunchesSection extends StatelessWidget {
     this.sugestoes = const [],
     this.titulo = 'Registros de hoje',
     this.mostrarPrevistas = false,
+    this.data,
   });
 
   static const _labels = [
@@ -1529,6 +1532,67 @@ class _PunchesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dsr = (jornada ?? '').trim().toUpperCase().contains('DSR');
+    if (dsr && punches.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            titulo,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A202C),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE3E9FF)),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.beach_access_outlined,
+                  color: Color(0xFF0109B2),
+                  size: 34,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'DSR',
+                  style: TextStyle(
+                    color: Color(0xFF0109B2),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Descanso Semanal Remunerado',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                ),
+                if (data != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    formatWeekdayPt(data!),
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     final apiSug = _sugestoesApi();
     final previstas = _jornadaPrevista();
     final slots = _slotsPorVazios(punches, sugestoes) ??
@@ -1543,6 +1607,17 @@ class _PunchesSection extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: Color(0xFF1A202C)),
         ),
+        if (dsr && punches.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          const Text(
+            'Domingo trabalhado: pausa sugerida de 15 min (jornada de 6h).',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         if (punches.isEmpty && !mostrarPrevistas)
           Container(

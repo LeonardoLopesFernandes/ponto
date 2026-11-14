@@ -259,6 +259,7 @@ class _PunchDialogState extends State<PunchDialog> {
   }
 
   Widget _buildConfirmStep() {
+    final pausa = _pausaSugerida();
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -340,6 +341,34 @@ class _PunchDialogState extends State<PunchDialog> {
             ],
           ),
         ),
+        if (pausa != null) ...[
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.free_breakfast_outlined,
+                    color: PontoApp.brand, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pausa sugerida: $pausa',
+                    style: const TextStyle(
+                      color: Color(0xFF475569),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -347,6 +376,17 @@ class _PunchDialogState extends State<PunchDialog> {
   /// Prefere a jornada do espelho (do site) quando disponível:
   /// "08:50 | 12:50 | 14:20 | 17:40" -> pausa = horários 2 e 3.
   String? _pausaSugerida() {
+    if (DateTime.now().weekday == DateTime.sunday) {
+      final inicio = widget.existingPunches.isNotEmpty
+          ? _parseHm(widget.existingPunches.first)
+          : null;
+      if (inicio != null) {
+        final inicioPausa = inicio.add(const Duration(hours: 3));
+        final fimPausa = inicioPausa.add(const Duration(minutes: 15));
+        return '${_fmtHm(inicioPausa)} - ${_fmtHm(fimPausa)} (15 min)';
+      }
+      return '15 min';
+    }
     final j = widget.sugestaoPausa;
     if (j != null && j.isNotEmpty) {
       final parts =
