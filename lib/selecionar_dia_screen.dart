@@ -512,31 +512,41 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
     final previstas = _previstasDosSlots(espelho);
     final slots = List<String?>.filled(4, null);
     final usados = <int>{};
+    final vazios = <int>[];
+    for (var i = 0; i < 4; i++) {
+      if (previstas[i].isEmpty) vazios.add(i);
+    }
 
-    for (final raw in espelho.batidasDia) {
-      final hora = formatPunchTime(raw);
-      final alvo = _minutos(hora);
-      var melhor = -1;
-      var menorDistancia = 9999;
-      for (var i = 0; i < 4; i++) {
-        if (previstas[i].isEmpty || usados.contains(i)) continue;
-        final distancia = (_minutos(previstas[i]) - alvo).abs();
-        if (distancia < menorDistancia) {
-          menorDistancia = distancia;
-          melhor = i;
-        }
+    if (vazios.length == espelho.batidasDia.length) {
+      for (var i = 0; i < vazios.length; i++) {
+        slots[vazios[i]] = formatPunchTime(espelho.batidasDia[i]);
       }
-      if (melhor < 0) {
+    } else {
+      for (final raw in espelho.batidasDia) {
+        final hora = formatPunchTime(raw);
+        final alvo = _minutos(hora);
+        var melhor = -1;
+        var menorDistancia = 9999;
         for (var i = 0; i < 4; i++) {
-          if (slots[i] == null) {
+          if (previstas[i].isEmpty || usados.contains(i)) continue;
+          final distancia = (_minutos(previstas[i]) - alvo).abs();
+          if (distancia < menorDistancia) {
+            menorDistancia = distancia;
             melhor = i;
-            break;
           }
         }
-      }
-      if (melhor >= 0) {
-        slots[melhor] = hora;
-        usados.add(melhor);
+        if (melhor < 0) {
+          for (var i = 0; i < 4; i++) {
+            if (slots[i] == null) {
+              melhor = i;
+              break;
+            }
+          }
+        }
+        if (melhor >= 0) {
+          slots[melhor] = hora;
+          usados.add(melhor);
+        }
       }
     }
 
