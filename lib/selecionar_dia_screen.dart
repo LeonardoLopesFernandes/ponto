@@ -68,6 +68,123 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
     _selecionar(DateTime(agora.year, agora.month, agora.day));
   }
 
+  Future<void> _abrirSeletorMes() async {
+    final escolhido = await showDialog<DateTime>(
+      context: context,
+      builder: (_) => _SeletorMesDialog(
+        anoInicial: _data.year,
+        mesSelecionado: _data.month,
+        cor: Theme.of(context).colorScheme.primary,
+      ),
+    );
+    if (escolhido == null || !mounted) return;
+    final ultimoDia =
+        DateTime(escolhido.year, escolhido.month + 1, 0).day;
+    final dia = _data.day > ultimoDia ? ultimoDia : _data.day;
+    _selecionar(DateTime(escolhido.year, escolhido.month, dia));
+  }
+
+  void _anterior() {
+    _selecionar(_data.subtract(const Duration(days: 1)));
+  }
+
+  void _seguinte() {
+    final hoje = DateTime.now();
+    final proximo = _data.add(const Duration(days: 1));
+    if (proximo.isAfter(DateTime(hoje.year, hoje.month, hoje.day))) return;
+    _selecionar(proximo);
+  }
+
+  Future<void> _mostrarEscala() async {
+    final jornada = _espelho?.jornada ?? '';
+    final escala = _espelho?.escala ?? '';
+    if (jornada.isEmpty && escala.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD9D9D9),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 18,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Escala/Jornada',
+                style: TextStyle(
+                  color: Color(0xFF1F2937),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (jornada.isNotEmpty)
+                Text(
+                  jornada,
+                  style: const TextStyle(
+                    color: Color(0xFF374151),
+                    fontSize: 18,
+                    height: 1.4,
+                  ),
+                ),
+              if (escala.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  escala,
+                  style: const TextStyle(
+                    color: Color(0xFF374151),
+                    fontSize: 17,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _diaComMenu(Color cor) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _circuloDia(cor, 180),
+        Positioned(
+          top: 6,
+          right: -8,
+          child: Material(
+            color: const Color(0xFFD1D5DB),
+            shape: const CircleBorder(),
+            elevation: 2,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _mostrarEscala,
+              child: const SizedBox(
+                width: 46,
+                height: 46,
+                child: Icon(Icons.more_horiz, color: Colors.white, size: 28),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _incluirSolicitacao() async {
     final enviado = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -121,13 +238,27 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    mesAnoTexto,
-                    style: const TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                  InkWell(
+                    onTap: _abrirSeletorMes,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            mesAnoTexto,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.arrow_drop_down, color: cor, size: 22),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -171,13 +302,32 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
                     if (_expandido && _tab == 0) _calendario(cor),
                     if (_expandido && _tab == 1) _resumoDoMes(),
                     if (!_expandido) ...[
-                      _circuloDia(cor, 220),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            onPressed: _anterior,
+                            icon: Icon(Icons.chevron_left, color: cor, size: 36),
+                            tooltip: 'Dia anterior',
+                          ),
+                          _diaComMenu(cor),
+                          IconButton(
+                            onPressed: _ehHoje ? null : _seguinte,
+                            icon: Icon(
+                              Icons.chevron_right,
+                              color: _ehHoje ? const Color(0xFFCBD5E1) : cor,
+                              size: 36,
+                            ),
+                            tooltip: 'Próximo dia',
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
                       _resumoDia(),
                     ],
                     if (_expandido) ...[
                       const SizedBox(height: 20),
-                      _circuloDia(cor, 140),
+                      _diaEBatidas(cor),
                       const SizedBox(height: 20),
                     ],
                     Padding(
@@ -309,6 +459,107 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
     );
   }
 
+  Widget _diaEBatidas(Color cor) {
+    final batidas = _espelho?.batidasDia ?? const <String>[];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          _circuloDiaContorno(cor, 92),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _carregando
+                ? const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : batidas.isEmpty
+                    ? const Text(
+                        'Sem batidas neste dia',
+                        style: TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 12,
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: batidas
+                              .take(4)
+                              .map(
+                                (hora) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _batidaCirculo(formatPunchTime(hora), cor),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _circuloDiaContorno(Color cor, double tamanho) {
+    return Container(
+      width: tamanho,
+      height: tamanho,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: cor, width: 1.5),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            formatWeekdayPt(_data).substring(0, 3).toUpperCase(),
+            style: TextStyle(
+              color: cor,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+          Text(
+            '${_data.day}',
+            style: TextStyle(
+              color: cor,
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              height: 0.95,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _batidaCirculo(String hora, Color cor) {
+    return Container(
+      width: 64,
+      height: 64,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: cor, width: 1.3),
+      ),
+      child: Text(
+        hora,
+        style: TextStyle(
+          color: cor,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
   Widget _circuloDia(Color cor, double tamanho) {
     return Container(
       width: tamanho,
@@ -321,7 +572,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
             formatWeekdayPt(_data).substring(0, 3).toUpperCase(),
             style: TextStyle(
               color: Colors.white,
-              fontSize: tamanho > 180 ? 26 : 18,
+              fontSize: tamanho > 150 ? 26 : 18,
               fontWeight: FontWeight.w500,
               letterSpacing: 1,
             ),
@@ -330,7 +581,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
             '${_data.day}',
             style: TextStyle(
               color: Colors.white,
-              fontSize: tamanho > 180 ? 72 : 46,
+              fontSize: tamanho > 150 ? 72 : 46,
               fontWeight: FontWeight.w700,
               height: 0.95,
             ),
@@ -514,6 +765,125 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SeletorMesDialog extends StatefulWidget {
+  final int anoInicial;
+  final int mesSelecionado;
+  final Color cor;
+
+  const _SeletorMesDialog({
+    required this.anoInicial,
+    required this.mesSelecionado,
+    required this.cor,
+  });
+
+  @override
+  State<_SeletorMesDialog> createState() => _SeletorMesDialogState();
+}
+
+class _SeletorMesDialogState extends State<_SeletorMesDialog> {
+  static const _meses = [
+    'JAN.',
+    'FEV.',
+    'MAR.',
+    'ABR.',
+    'MAI.',
+    'JUN.',
+    'JUL.',
+    'AGO.',
+    'SET.',
+    'OUT.',
+    'NOV.',
+    'DEZ.',
+  ];
+  late int _ano;
+
+  @override
+  void initState() {
+    super.initState();
+    _ano = widget.anoInicial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: SizedBox(
+        width: 340,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => setState(() => _ano--),
+                    icon: Icon(Icons.chevron_left, color: widget.cor, size: 30),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '$_ano',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => setState(() => _ano++),
+                    icon: Icon(Icons.chevron_right, color: widget.cor, size: 30),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 2.15,
+                children: List.generate(12, (i) {
+                  final mes = i + 1;
+                  final selecionado = mes == widget.mesSelecionado &&
+                      _ano == widget.anoInicial;
+                  return Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(
+                        DateTime(_ano, mes),
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: selecionado
+                            ? BoxDecoration(
+                                color: widget.cor,
+                                borderRadius: BorderRadius.circular(4),
+                              )
+                            : null,
+                        child: Text(
+                          _meses[i],
+                          style: TextStyle(
+                            color: selecionado ? Colors.white : Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
         ),
       ),
     );

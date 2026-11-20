@@ -31,6 +31,7 @@ class PunchResult {
   final String? employeeName;
   final List<String> batidasDia;
   final String? jornada;
+  final String? escala;
   final String? saldoBancoHoras;
   final String? saldoMes;
   final List<({String descricao, String valor})> resumoDia;
@@ -49,6 +50,7 @@ class PunchResult {
     this.employeeName,
     this.batidasDia = const [],
     this.jornada,
+    this.escala,
     this.saldoBancoHoras,
     this.saldoMes,
     this.resumoDia = const [],
@@ -726,6 +728,7 @@ class PunchRepository {
       ultimoEspelhoJson = jsonEncode(espelho ?? <String, dynamic>{});
       final jornada =
           (dia?['jornada'] ?? dia?['jornadaPrevista'] ?? '').toString();
+      final escala = (dia?['escala'] ?? '').toString();
       // As reais vêm com tipo "ORIGINAL"; as pausas pré-assinaladas pelo
       // site vêm como "MANUAL" com tipoIdentificador "I"; e as previstas
       // como "PREVISTA". Mantemos a posição de cada slot.
@@ -768,6 +771,7 @@ class PunchRepository {
         day: dia?['referencia']?.toString(),
         batidasDia: espelhoBatidas,
         jornada: jornada,
+        escala: escala,
         saldoMes: saldos.mes,
         saldoBancoHoras: saldos.total,
         resumoDia: resumo,
