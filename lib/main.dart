@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/punch_api.dart';
 import 'incluir_batida_screen.dart';
+import 'selecionar_dia_screen.dart';
 import 'punch_dialog.dart';
 import 'package:lottie/lottie.dart';
 import 'widgets/ponto_logo_animado.dart';
@@ -605,6 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _todayPunches = [];
   String? _jornada;
   String? _saldoBancoHoras;
+  String? _saldoMes;
   List<String> _sugestoes = [];
   late DateTime _now;
   late DateTime _selectedDate;
@@ -679,6 +681,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (esp.sugestoes.isNotEmpty) {
         _sugestoes = esp.sugestoes;
       }
+      _saldoMes = esp.saldoMes != null && esp.saldoMes!.isNotEmpty
+          ? esp.saldoMes
+          : null;
       _saldoBancoHoras = esp.saldoBancoHoras != null &&
               esp.saldoBancoHoras!.isNotEmpty
           ? esp.saldoBancoHoras
@@ -722,30 +727,23 @@ class _HomeScreenState extends State<HomeScreen> {
   bool get _isHoje => _sameDay(_selectedDate, DateTime.now());
 
   Future<void> _pickDate() async {
-    final hoje = DateTime.now();
-    final primeiro = DateTime(hoje.year - 1, 1, 1);
-    final ultimo = DateTime(hoje.year, hoje.month, hoje.day);
-    var inicial = _selectedDate;
-    if (inicial.isBefore(primeiro)) inicial = primeiro;
-    if (inicial.isAfter(ultimo)) inicial = ultimo;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: inicial,
-      firstDate: primeiro,
-      lastDate: ultimo,
-      helpText: 'Escolha o dia',
-      cancelText: 'Cancelar',
-      confirmText: 'Ver dia',
-      fieldLabelText: 'Dia',
-      fieldHintText: 'dd/mm/aaaa',
+    final repo = _repository;
+    if (repo == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SelecionarDiaScreen(
+          inicial: _selectedDate,
+          repository: repo,
+          onDateChanged: (dia) {
+            if (_sameDay(dia, DateTime.now())) {
+              _voltarParaHoje();
+            } else {
+              _carregarDia(dia);
+            }
+          },
+        ),
+      ),
     );
-    if (picked == null || !mounted) return;
-    final dia = DateTime(picked.year, picked.month, picked.day);
-    if (_sameDay(dia, DateTime.now())) {
-      _voltarParaHoje();
-    } else {
-      _carregarDia(dia);
-    }
   }
 
   Future<void> _carregarDia(DateTime dia) async {
@@ -766,6 +764,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _historicoErro =
           esp == null ? 'Não foi possível carregar este dia.' : null;
       // Atualiza o saldo do mês correspondente ao dia selecionado.
+      _saldoMes = esp?.saldoMes != null && esp!.saldoMes!.isNotEmpty
+          ? esp.saldoMes
+          : null;
       _saldoBancoHoras = esp?.saldoBancoHoras != null &&
               esp!.saldoBancoHoras!.isNotEmpty
           ? esp.saldoBancoHoras
@@ -910,6 +911,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _todayPunches = [];
             _jornada = null;
             _saldoBancoHoras = null;
+            _saldoMes = null;
             _sugestoes = [];
           });
           _atualizarEspelho();
@@ -1057,42 +1059,88 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        bottomNavigationBar: _SaldoBancoBar(saldo: _saldoBancoHoras),
+        bottomNavigationBar: _SaldoBancoBar(
+          saldoMes: _saldoMes,
+          saldoTotal: _saldoBancoHoras,
+        ),
       ),
     );
   }
 }
 
 class _SaldoBancoBar extends StatelessWidget {
-  final String? saldo;
-  const _SaldoBancoBar({this.saldo});
+  final String? saldoMes;
+  final String? saldoTotal;
+  const _SaldoBancoBar({this.saldoMes, this.saldoTotal});
+
+  static String _valor(String? v) =>
+      (v == null || v.isEmpty) ? '--:--' : v;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFF5CB85C),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
-            const Expanded(
-              child: Text(
-                'SALDO DO MÊS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.5,
-                ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'SALDO DO MÊS',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _valor(saldoMes),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(
-              (saldo == null || saldo!.isEmpty) ? '--:--' : saldo!,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+            Container(
+              width: 1,
+              height: 34,
+              color: Colors.white24,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'SALDO',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _valor(saldoTotal),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
