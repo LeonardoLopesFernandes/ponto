@@ -508,7 +508,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
   }
 
   List<({String hora, bool previsto})> _entradasDia(PunchResult? espelho) {
-    if (espelho == null) return const [];
+    if (espelho == null || espelho.batidasDia.isEmpty) return const [];
     final previstas = _previstasDosSlots(espelho);
     final slots = List<String?>.filled(4, null);
     final usados = <int>{};
@@ -557,17 +557,40 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
     for (var i = 0; i < 4 && i < espelho.sugestoes.length; i++) {
       previstas[i] = formatPunchTime(espelho.sugestoes[i]);
     }
-    if (previstas.every((h) => h.isEmpty)) {
-      final horarios = RegExp(r'([01]?\d|2[0-3]):[0-5]\d')
-          .allMatches(espelho.jornada ?? '')
-          .map((m) => m.group(0)!)
-          .take(4)
-          .toList();
-      for (var i = 0; i < horarios.length; i++) {
-        previstas[i] = horarios[i];
-      }
+    final horarios = _horariosJornada(espelho.jornada);
+    final fallback = horarios.length >= 4
+        ? horarios
+        : _horariosEscala(espelho.escala);
+    for (var i = 0; i < 4 && i < fallback.length; i++) {
+      if (previstas[i].isEmpty) previstas[i] = fallback[i];
     }
     return previstas;
+  }
+
+  List<String> _horariosJornada(String? jornada) {
+    return RegExp(r'([01]?\d|2[0-3]):[0-5]\d')
+        .allMatches(jornada ?? '')
+        .map((m) => m.group(0)!)
+        .take(4)
+        .toList();
+  }
+
+  List<String> _horariosEscala(String? escala) {
+    final base = (escala ?? '').split('//').first.trim();
+    if (base.isEmpty) return const [];
+    final partes = base
+        .split(RegExp(r'[-x/]'))
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    final horarios = <String>[];
+    for (final parte in partes) {
+      final digitos = parte.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digitos.length == 4) {
+        horarios.add('${digitos.substring(0, 2)}:${digitos.substring(2)}');
+      }
+    }
+    return horarios.take(4).toList();
   }
 
   int _minutos(String hora) {
