@@ -460,7 +460,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
   }
 
   Widget _diaEBatidas(Color cor) {
-    final batidas = _espelho?.batidasDia ?? const <String>[];
+    final entradas = _entradasDia(_espelho);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -476,7 +476,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : batidas.isEmpty
+                : entradas.isEmpty
                     ? const Text(
                         'Sem batidas neste dia',
                         style: TextStyle(
@@ -487,12 +487,15 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
                     : SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: batidas
-                              .take(4)
+                          children: entradas
                               .map(
-                                (hora) => Padding(
+                                (entrada) => Padding(
                                   padding: const EdgeInsets.only(right: 8),
-                                  child: _batidaCirculo(formatPunchTime(hora), cor),
+                                  child: _batidaCirculo(
+                                    entrada.hora,
+                                    cor,
+                                    previsto: entrada.previsto,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -502,6 +505,75 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
         ],
       ),
     );
+  }
+
+  List<({String hora, bool previsto})> _entradasDia(PunchResult? espelho) {
+    if (espelho == null) return const [];
+    final previstas = _previstasDosSlots(espelho);
+    final slots = List<String?>.filled(4, null);
+    final usados = <int>{};
+
+    for (final raw in espelho.batidasDia) {
+      final hora = formatPunchTime(raw);
+      final alvo = _minutos(hora);
+      var melhor = -1;
+      var menorDistancia = 9999;
+      for (var i = 0; i < 4; i++) {
+        if (previstas[i].isEmpty || usados.contains(i)) continue;
+        final distancia = (_minutos(previstas[i]) - alvo).abs();
+        if (distancia < menorDistancia) {
+          menorDistancia = distancia;
+          melhor = i;
+        }
+      }
+      if (melhor < 0) {
+        for (var i = 0; i < 4; i++) {
+          if (slots[i] == null) {
+            melhor = i;
+            break;
+          }
+        }
+      }
+      if (melhor >= 0) {
+        slots[melhor] = hora;
+        usados.add(melhor);
+      }
+    }
+
+    final resultado = <({String hora, bool previsto})>[];
+    for (var i = 0; i < 4; i++) {
+      final real = slots[i];
+      if (real != null) {
+        resultado.add((hora: real, previsto: false));
+      } else if (previstas[i].isNotEmpty) {
+        resultado.add((hora: previstas[i], previsto: true));
+      }
+    }
+    return resultado;
+  }
+
+  List<String> _previstasDosSlots(PunchResult espelho) {
+    final previstas = List<String>.filled(4, '');
+    for (var i = 0; i < 4 && i < espelho.sugestoes.length; i++) {
+      previstas[i] = formatPunchTime(espelho.sugestoes[i]);
+    }
+    if (previstas.every((h) => h.isEmpty)) {
+      final horarios = RegExp(r'([01]?\d|2[0-3]):[0-5]\d')
+          .allMatches(espelho.jornada ?? '')
+          .map((m) => m.group(0)!)
+          .take(4)
+          .toList();
+      for (var i = 0; i < horarios.length; i++) {
+        previstas[i] = horarios[i];
+      }
+    }
+    return previstas;
+  }
+
+  int _minutos(String hora) {
+    final partes = hora.split(':');
+    return (int.tryParse(partes.first) ?? 0) * 60 +
+        (partes.length > 1 ? int.tryParse(partes[1]) ?? 0 : 0);
   }
 
   Widget _circuloDiaContorno(Color cor, double tamanho) {
@@ -539,7 +611,12 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
     );
   }
 
-  Widget _batidaCirculo(String hora, Color cor) {
+  Widget _batidaCirculo(
+    String hora,
+    Color cor, {
+    bool previsto = false,
+  }) {
+    final tom = previsto ? const Color(0xFF94A3B8) : cor;
     return Container(
       width: 64,
       height: 64,
@@ -547,14 +624,14 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        border: Border.all(color: cor, width: 1.3),
+        border: Border.all(color: tom, width: previsto ? 1 : 1.3),
       ),
       child: Text(
         hora,
         style: TextStyle(
-          color: cor,
+          color: tom,
           fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontWeight: previsto ? FontWeight.w400 : FontWeight.w500,
         ),
       ),
     );
