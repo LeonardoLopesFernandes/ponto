@@ -462,11 +462,11 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
   Widget _diaEBatidas(Color cor) {
     final entradas = _entradasDia(_espelho);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          _circuloDiaContorno(cor, 92),
-          const SizedBox(width: 12),
+          _circuloDiaContorno(cor, 70),
+          const SizedBox(width: 8),
           Expanded(
             child: _carregando
                 ? const Center(
@@ -490,7 +490,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
                           children: entradas
                               .map(
                                 (entrada) => Padding(
-                                  padding: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.only(right: 5),
                                   child: _batidaCirculo(
                                     entrada.hora,
                                     cor,
@@ -592,7 +592,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
             formatWeekdayPt(_data).substring(0, 3).toUpperCase(),
             style: TextStyle(
               color: cor,
-              fontSize: 13,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.5,
             ),
@@ -601,7 +601,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
             '${_data.day}',
             style: TextStyle(
               color: cor,
-              fontSize: 32,
+              fontSize: 26,
               fontWeight: FontWeight.w700,
               height: 0.95,
             ),
@@ -618,8 +618,8 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
   }) {
     final tom = previsto ? const Color(0xFF94A3B8) : cor;
     return Container(
-      width: 64,
-      height: 64,
+      width: 48,
+      height: 48,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.white,
@@ -630,7 +630,7 @@ class _SelecionarDiaScreenState extends State<SelecionarDiaScreen> {
         hora,
         style: TextStyle(
           color: tom,
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: previsto ? FontWeight.w400 : FontWeight.w500,
         ),
       ),
